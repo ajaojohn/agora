@@ -14,6 +14,11 @@ export default defineConfig({
       alias: { '@shared': resolve(__dirname, 'src/shared') },
     },
   },
+  preload: {
+    resolve: {
+      alias: { '@shared': resolve(__dirname, 'src/shared') },
+    },
+  },
   renderer: {
     plugins: [react()],
     resolve: {
