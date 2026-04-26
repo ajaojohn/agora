@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Cursor-style Electron desktop app that hosts multiple workspace sessions, each a terminal attached to a chosen directory. The terminal runs a plain login shell — **it does not auto-invoke any agent CLI**. Users type `claude`, `cursor-agent`, `aider`, or anything else themselves. Despite the project name, do not re-couple the app to a specific agent.
+A macOS Electron desktop app that hosts multiple workspace sessions in a single window. Each session is a tab bound to a cwd, containing an agent-CLI terminal (left pane) and an integrated diff/edit/tree pane (right). The terminal runs a plain login shell — **it does not auto-invoke any agent CLI**. Users type `claude`, `cursor-agent`, `aider`, or anything else themselves.
 
-Currently at Milestone 1 (single-session terminal). Milestones 2–4 add multi-session tabs + persistence, a file tree + Monaco editor, and packaging. The approved plan is at `/Users/john/.claude/plans/now-i-want-to-iridescent-frost.md`.
+**Why this exists vs cmux**: cmux solves parallel agent terminals; Agora extends to integrated diff/edit/tree per tab so the user doesn't alt-tab to N Cursor windows. The integrated right pane is the entire reason Agora exists — without it, Agora is "cmux but Electron and worse." See `.plan/mvp-design.md` for the full thesis.
+
+**Status (2026-04-25)**: M1 (single-session terminal) is being rebuilt from scratch on the `m1-terminal-skeleton` branch with current toolchain (Electron 41, TS 6, electron-vite 5). M2 adds multi-tab + persistence + attention indicators. M3 (the differentiation) adds the diff view + tree + editor + secondary terminals. M4 ships a Mac dmg. **Mac-only for v1**; Linux/Windows deferred. See `.plan/roadmap.md`.
 
 ## Working style
 
