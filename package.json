@@ -1,0 +1,31 @@
+{
+  "name": "agora",
+  "version": "0.0.1",
+  "description": "Cursor-style Electron desktop app hosting multiple workspace sessions",
+  "private": true,
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ajaojohn/agora.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ajaojohn/agora/issues"
+  },
+  "homepage": "https://github.com/ajaojohn/agora#readme",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "electron": "^41.3.0",
+    "electron-vite": "^5.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.2"
+  }
+}
