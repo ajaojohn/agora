@@ -1,0 +1,10 @@
+node_modules
+out
+dist
+.DS_Store
+*.log
+.vite
+
+# Plans live in a separate private repo (github.com/ajaojohn/agora-plan)
+# mounted at .plan/ locally. Do not commit them to the public repo.
+.plan/
