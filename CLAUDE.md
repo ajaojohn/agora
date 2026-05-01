@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A macOS Electron desktop app that hosts multiple workspace sessions in a single window. Each session is a tab bound to a cwd, containing an agent-CLI terminal (left pane) and an integrated diff/edit/tree pane (right). The terminal runs a plain login shell — **it does not auto-invoke any agent CLI**. Users type `claude`, `cursor-agent`, `aider`, or anything else themselves.
+A macOS Electron desktop app. Each tab embeds a full VS Code instance via [code-server](https://github.com/coder/code-server) hosted in an Electron `<webview>`, bound to its own cwd. Claude Code in code-server's integrated terminal detects real VS Code → IDE-integrated mode fires natively (graphical diff, @ mentions, auto-accept).
 
-**Why this exists vs cmux**: cmux solves parallel agent terminals; Agora extends to integrated diff/edit/tree per tab so the user doesn't alt-tab to N Cursor windows. The integrated right pane is the entire reason Agora exists — without it, Agora is "cmux but Electron and worse." See `.plan/mvp-design.md` for the full thesis.
+**Why this exists vs cmux**: cmux solves parallel agent terminals; Agora extends to integrated full-IDE per tab. Each tab is `(cwd + code-server VS Code + Claude Code IDE features)`. cmux + N IDEs becomes Agora's N tabs. See `.plan/vision.md` for the thesis and `.plan/decisions.md` for why this design (Path D) was chosen over forking VS Code or building from scratch.
 
-**Status (2026-04-25)**: M1 (single-session terminal) is being rebuilt from scratch on the `m1-terminal-skeleton` branch with current toolchain (Electron 41, TS 6, electron-vite 5). M2 adds multi-tab + persistence + attention indicators. M3 (the differentiation) adds the diff view + tree + editor + secondary terminals. M4 ships a Mac dmg. **Mac-only for v1**; Linux/Windows deferred. See `.plan/roadmap.md`.
+**Status (2026-04-28)**: M1 (single-session: folder picker → embedded code-server in webview) being rebuilt on the `m1-terminal-skeleton` branch with current toolchain (Electron 41, TS 6, electron-vite 5). Commits 1-5 done (tooling, main, React, preload, IPC contract); commits 6-10 reshape around code-server lifecycle instead of node-pty. M2 adds multi-tab + persistence + attention detection (via auto-installed `agora-helper` VS Code extension). M3 polish. M4 Mac packaging. **Mac-only for v1**; Linux/Windows deferred. See `.plan/roadmap.md`.
 
 ## Working style
 
@@ -65,15 +65,17 @@ Planning and codebase documentation live in `.plan/`, which is a **separate priv
 
 Inside `.plan/`:
 
-- **`overview.md`** — per-file living reference. **Update it in the same commit as any non-trivial change under `src/`.** Missing entries are treated as broken builds. Since it lives in a separate repo, that's a separate `cd .plan && git commit` — the parent repo won't track the change.
-- **`roadmap.md`** — the M1–M4 milestone plan, IPC contract, architecture, risks.
-- **`m1.md`** (and later `m2.md`, …) — per-milestone completion records.
+- **`vision.md`** — product thesis (what + why). Read first.
+- **`roadmap.md`** — milestone plan (M1–M4), IPC contract, architecture, risks.
+- **`decisions.md`** — architecture decision rationale (why Path D, what was rejected).
+- **`history.md`** — past-milestone ship records and rebuild-status notes. Append M2/M3 sections as they ship.
+- **`code-map.md`** — per-file living reference. **Update it in the same commit as any non-trivial change under `src/`.** Missing entries are treated as broken builds. Since it lives in a separate repo, that's a separate `cd .plan && git commit` — the parent repo won't track the change.
 
 Start there before diving into code.
 
 ### Comment convention
 
-Every source file has a **light header comment** (1–3 lines) explaining its purpose and who uses it. Non-obvious exports get a one-line comment; obvious ones (where the name and signature already tell the story) get nothing. **Never** multi-paragraph docstrings, line-by-line narration, or `@param` blocks where TypeScript types already speak. Don't strip these back out — they're the project's onboarding surface alongside `.plan/overview.md`.
+Every source file has a **light header comment** (1–3 lines) explaining its purpose and who uses it. Non-obvious exports get a one-line comment; obvious ones (where the name and signature already tell the story) get nothing. **Never** multi-paragraph docstrings, line-by-line narration, or `@param` blocks where TypeScript types already speak. Don't strip these back out — they're the project's onboarding surface alongside `.plan/code-map.md`.
 
 ## Native modules
 
