@@ -1,10 +1,11 @@
 // Preload script. Bridges main's IPC handlers to the renderer via window.api.
-// Empty for now — channels added in commit 6 onward.
-import { contextBridge } from 'electron';
-import type { RendererApi } from '@shared/ipc';
+import { contextBridge, ipcRenderer } from "electron";
+import { IPC, type RendererApi } from "@shared/ipc";
 
-const api: RendererApi = {};
+const api: RendererApi = {
+  pickFolder: () => ipcRenderer.invoke(IPC.dialogPickFolder),
+};
 
 // Puts `api` on the renderer's `window` as `window.api`.
 // contextIsolation blocks direct assignment, so the bridge is the only way across.
-contextBridge.exposeInMainWorld('api', api);
+contextBridge.exposeInMainWorld("api", api);

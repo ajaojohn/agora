@@ -10,9 +10,11 @@
 // Missing any step produces compile errors on both sides.
 
 export const IPC = {
-  // populated in commit 6+
+  dialogPickFolder: "dialog:pickFolder",
 } as const;
 
+export type PickFolderResponse = { path: string } | null;
+
 export interface RendererApi {
-  // populated in commit 6+
+  pickFolder(): Promise<PickFolderResponse>;
 }
