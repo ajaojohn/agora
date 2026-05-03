@@ -24,7 +24,8 @@
     "mac": {
       "target": "dmg",
       "category": "public.app-category.developer-tools",
-      "identity": "-"
+      "identity": "-",
+      "icon": "build/icon.png"
     }
   },
   "repository": {
