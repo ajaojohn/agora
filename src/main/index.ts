@@ -1,8 +1,15 @@
-// Main process entry. Owns app lifecycle and the BrowserWindow.
-// Preload, IPC, and PTY ownership land in later commits.
-import { app, BrowserWindow } from "electron";
+// Main process entry. Owns app lifecycle, the BrowserWindow, and the
+// SessionManager that supervises code-server child processes.
+import { app, BrowserWindow, dialog } from "electron";
 import { join } from "path";
 import { registerDialogIpc } from "./ipc/dialog";
+import { locateCodeServer, CodeServerNotFoundError } from "./codeServerLocator";
+import { SessionManager } from "./sessionManager";
+
+// Module-scope so before-quit / window-all-closed handlers can dispose it.
+// Null until app.whenReady resolves the locator. IPC handlers (commit 8) will
+// guard against null and surface a UI error if the binary went missing.
+let sessionManager: SessionManager | null = null;
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -26,7 +33,29 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(createWindow);
+async function bootstrap(): Promise<void> {
+  try {
+    const codeServerPath = await locateCodeServer();
+    sessionManager = new SessionManager({
+      codeServerPath,
+      userDataDir: join(app.getPath("userData"), "code-server-data"),
+    });
+    console.log(`[main] code-server resolved at ${codeServerPath}`);
+  } catch (err) {
+    if (err instanceof CodeServerNotFoundError) {
+      // Show a blocking error dialog so the missing-dep state is impossible to miss.
+      // Replaced by an in-app empty state once the renderer can render one (M1 commit 10).
+      dialog.showErrorBox("code-server not found", err.message);
+      app.quit();
+      return;
+    }
+    throw err;
+  }
+
+  createWindow();
+}
+
+app.whenReady().then(bootstrap);
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
@@ -35,4 +64,18 @@ app.on("window-all-closed", () => {
 // Mac convention: clicking the dock icon with no windows open re-opens one.
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+
+// Kill every code-server child before the app fully exits. before-quit fires
+// while the event loop is still spinning, so async disposeAll can complete.
+app.on("before-quit", async (event) => {
+  if (!sessionManager) return;
+  const manager = sessionManager;
+  sessionManager = null;
+  event.preventDefault();
+  try {
+    await manager.disposeAll();
+  } finally {
+    app.exit(0);
+  }
 });
