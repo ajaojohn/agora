@@ -7,6 +7,7 @@ import { join } from "path";
 import { registerDialogIpc } from "./ipc/dialog";
 import { registerSessionIpc } from "./ipc/session";
 import { registerViewIpc } from "./ipc/view";
+import { registerWorkspaceIpc } from "./ipc/workspace";
 import { locateCodeServer, CodeServerNotFoundError } from "./codeServerLocator";
 import { SessionManager } from "./sessionManager";
 import { ViewManager } from "./viewManager";
@@ -53,6 +54,7 @@ async function bootstrap(): Promise<void> {
     registerDialogIpc();
     registerSessionIpc(sessionManager);
     registerViewIpc(viewManager, sessionManager);
+    registerWorkspaceIpc(workspaceStore);
     console.log(`[main] code-server resolved at ${codeServerPath}`);
     console.log(
       `[main] workspace loaded: ${workspace.tabs.length} tab(s), activeId=${workspace.activeId}`,

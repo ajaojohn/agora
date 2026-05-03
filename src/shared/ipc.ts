@@ -19,6 +19,9 @@ export const IPC = {
   viewAttach: "view:attach",
   viewSetBounds: "view:setBounds",
   viewDetach: "view:detach",
+  workspaceGet: "workspace:get",
+  workspaceSetTabs: "workspace:setTabs",
+  workspaceSetActive: "workspace:setActive",
 } as const;
 
 export type PickFolderResponse = { path: string } | null;
@@ -73,4 +76,10 @@ export interface RendererApi {
   attachView(sessionId: string): Promise<void>;
   setViewBounds(sessionId: string, bounds: ViewBounds): Promise<void>;
   detachView(sessionId: string): Promise<void>;
+  // Persisted tab list. getWorkspace returns the current snapshot (cheap,
+  // in-memory). setTabs / setActive mutate and schedule a debounced disk
+  // write; the change is visible immediately on subsequent getWorkspace.
+  getWorkspace(): Promise<Workspace>;
+  setWorkspaceTabs(tabs: Tab[]): Promise<void>;
+  setWorkspaceActive(activeId: string | null): Promise<void>;
 }

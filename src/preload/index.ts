@@ -11,6 +11,10 @@ const api: RendererApi = {
   setViewBounds: (sessionId, bounds) =>
     ipcRenderer.invoke(IPC.viewSetBounds, sessionId, bounds),
   detachView: (sessionId) => ipcRenderer.invoke(IPC.viewDetach, sessionId),
+  getWorkspace: () => ipcRenderer.invoke(IPC.workspaceGet),
+  setWorkspaceTabs: (tabs) => ipcRenderer.invoke(IPC.workspaceSetTabs, tabs),
+  setWorkspaceActive: (activeId) =>
+    ipcRenderer.invoke(IPC.workspaceSetActive, activeId),
 };
 
 // Puts `api` on the renderer's `window` as `window.api`.
