@@ -9,6 +9,8 @@
 //   (5) handle it in src/main/ipc/<area>.ts
 // Missing any step produces compile errors on both sides.
 
+import { z } from "zod";
+
 export const IPC = {
   dialogPickFolder: "dialog:pickFolder",
   sessionCreate: "session:create",
@@ -37,6 +39,28 @@ export interface ViewBounds {
   width: number;
   height: number;
 }
+
+// Persisted record of one project tab. Lives in workspace.json and is the
+// payload of workspace:* IPC. `id` is a stable UUID so renderer + main can
+// agree on identity across restarts (the runtime sessionId is regenerated
+// on each spawn). `order` defines display order in the tab bar.
+export const TabSchema = z.object({
+  id: z.string().min(1),
+  cwd: z.string().min(1),
+  order: z.number().int().nonnegative(),
+});
+export type Tab = z.infer<typeof TabSchema>;
+
+// Top-level shape of workspace.json. `activeId` is the tab the user was
+// last on -- bootstrap respawns this one eagerly. Null means no active tab
+// (cold launch with empty list, or user closed the last tab before quit).
+export const WorkspaceSchema = z.object({
+  tabs: z.array(TabSchema),
+  activeId: z.string().nullable(),
+});
+export type Workspace = z.infer<typeof WorkspaceSchema>;
+
+export const EMPTY_WORKSPACE: Workspace = { tabs: [], activeId: null };
 
 export interface RendererApi {
   pickFolder(): Promise<PickFolderResponse>;
