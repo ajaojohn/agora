@@ -12,6 +12,7 @@ import { locateCodeServer, CodeServerNotFoundError } from "./codeServerLocator";
 import { SessionManager } from "./sessionManager";
 import { ViewManager } from "./viewManager";
 import { WorkspaceStore } from "./workspaceStore";
+import { seedUserDataDir } from "./userDataSeeder";
 
 // Module-scope so before-quit can dispose them. Null until app.whenReady
 // resolves the locator and constructs the managers.
@@ -42,9 +43,17 @@ function createWindow(): void {
 async function bootstrap(): Promise<void> {
   try {
     const codeServerPath = await locateCodeServer();
+    const codeServerUserDataDir = join(
+      app.getPath("userData"),
+      "code-server-data",
+    );
+    // Seed default settings.json (theme) before SessionManager can spawn
+    // any code-server child. Only runs on first launch -- subsequent runs
+    // see the file already exists and skip.
+    await seedUserDataDir(codeServerUserDataDir);
     sessionManager = new SessionManager({
       codeServerPath,
-      userDataDir: join(app.getPath("userData"), "code-server-data"),
+      userDataDir: codeServerUserDataDir,
     });
     viewManager = new ViewManager();
     workspaceStore = new WorkspaceStore(
