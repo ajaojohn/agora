@@ -24,8 +24,6 @@ function createWindow(): void {
     },
   });
 
-  registerDialogIpc(win);
-
   // electron-vite sets ELECTRON_RENDERER_URL in dev so HMR works against the Vite dev server.
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL);
@@ -41,6 +39,7 @@ async function bootstrap(): Promise<void> {
       codeServerPath,
       userDataDir: join(app.getPath("userData"), "code-server-data"),
     });
+    registerDialogIpc();
     registerSessionIpc(sessionManager);
     console.log(`[main] code-server resolved at ${codeServerPath}`);
   } catch (err) {
