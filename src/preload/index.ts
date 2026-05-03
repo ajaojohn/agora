@@ -7,10 +7,11 @@ const api: RendererApi = {
   createSession: (cwd) => ipcRenderer.invoke(IPC.sessionCreate, cwd),
   closeSession: (sessionId) => ipcRenderer.invoke(IPC.sessionClose, sessionId),
   listSessions: () => ipcRenderer.invoke(IPC.sessionList),
-  attachView: (sessionId) => ipcRenderer.invoke(IPC.viewAttach, sessionId),
+  setActiveView: (sessionId) =>
+    ipcRenderer.invoke(IPC.viewSetActive, sessionId),
   setViewBounds: (sessionId, bounds) =>
     ipcRenderer.invoke(IPC.viewSetBounds, sessionId, bounds),
-  detachView: (sessionId) => ipcRenderer.invoke(IPC.viewDetach, sessionId),
+  closeView: (sessionId) => ipcRenderer.invoke(IPC.viewClose, sessionId),
   getWorkspace: () => ipcRenderer.invoke(IPC.workspaceGet),
   setWorkspaceTabs: (tabs) => ipcRenderer.invoke(IPC.workspaceSetTabs, tabs),
   setWorkspaceActive: (activeId) =>

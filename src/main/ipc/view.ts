@@ -1,13 +1,14 @@
 // IPC handlers for code-server WebContentsView lifecycle.
 //
-// Bridges renderer requests (`window.api.attachView` etc) to ViewManager.
-// Resolves the parent BrowserWindow from the IPC sender's WebContents so the
-// view attaches to the window the request came from -- no closure over a
-// module-scope window ref that could go stale on macOS activate.
+// Three channels: setActive (foreground a session, lazily spawn+load if
+// first time), setBounds (renderer-driven resize), close (permanent
+// destroy, used on close-tab).
 //
-// `attach` looks up the session's port on SessionManager. Renderer only knows
-// the sessionId; we keep the port-lookup detail server-side so a leaked port
-// number can't be used to attach a view to an unrelated child.
+// `setActive` resolves the parent BrowserWindow from the IPC sender's
+// WebContents so attaches stay correct after macOS recreates the window
+// on activate. The session's port is looked up server-side via
+// SessionManager.list -- renderer only knows the sessionId, can't aim a
+// view at an arbitrary localhost port.
 import { ipcMain, BrowserWindow } from "electron";
 import { IPC, type ViewBounds } from "@shared/ipc";
 import type { ViewManager } from "../viewManager";
@@ -18,21 +19,30 @@ export function registerViewIpc(
   sessionManager: SessionManager,
 ): void {
   ipcMain.handle(
-    IPC.viewAttach,
-    async (event, sessionId: string): Promise<void> => {
-      const session = sessionManager
-        .list()
-        .find((s) => s.sessionId === sessionId);
-      if (!session) {
-        throw new Error(`Unknown session: ${sessionId}`);
-      }
-
+    IPC.viewSetActive,
+    async (event, sessionId: string | null): Promise<void> => {
       const parent = BrowserWindow.fromWebContents(event.sender);
       if (!parent) {
         throw new Error("No parent window for IPC sender");
       }
 
-      await viewManager.attach(sessionId, session.port, parent);
+      // For null (hide current) we don't need a port. For a real sessionId
+      // we look up its port even if ViewManager already has the view --
+      // ViewManager ignores port when not first-time, so passing it is
+      // harmless and means we never have to track which sessions have
+      // been attached.
+      let port: number | undefined;
+      if (sessionId !== null) {
+        const session = sessionManager
+          .list()
+          .find((s) => s.sessionId === sessionId);
+        if (!session) {
+          throw new Error(`Unknown session: ${sessionId}`);
+        }
+        port = session.port;
+      }
+
+      await viewManager.setActive(sessionId, parent, port);
     },
   );
 
@@ -44,9 +54,9 @@ export function registerViewIpc(
   );
 
   ipcMain.handle(
-    IPC.viewDetach,
+    IPC.viewClose,
     async (_event, sessionId: string): Promise<void> => {
-      viewManager.detach(sessionId);
+      viewManager.close(sessionId);
     },
   );
 }

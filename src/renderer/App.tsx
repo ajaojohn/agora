@@ -21,7 +21,7 @@ export function App() {
     try {
       const session = await window.api.createSession(folder.path);
       setState({ kind: "loading", phase: "attaching", cwd: folder.path });
-      await window.api.attachView(session.sessionId);
+      await window.api.setActiveView(session.sessionId);
       setState({ kind: "active", session });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

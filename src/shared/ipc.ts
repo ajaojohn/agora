@@ -16,9 +16,9 @@ export const IPC = {
   sessionCreate: "session:create",
   sessionClose: "session:close",
   sessionList: "session:list",
-  viewAttach: "view:attach",
+  viewSetActive: "view:setActive",
   viewSetBounds: "view:setBounds",
-  viewDetach: "view:detach",
+  viewClose: "view:close",
   workspaceGet: "workspace:get",
   workspaceSetTabs: "workspace:setTabs",
   workspaceSetActive: "workspace:setActive",
@@ -70,12 +70,18 @@ export interface RendererApi {
   createSession(cwd: string): Promise<Session>;
   closeSession(sessionId: string): Promise<void>;
   listSessions(): Promise<Session[]>;
-  // Spawns a code-server WebContentsView for an existing session, waits for
-  // the port to be live + the page to render, resolves on success. Slow:
-  // 5-10s typical, can take up to 30s. Show a spinner.
-  attachView(sessionId: string): Promise<void>;
+  // Foregrounds the named session's WebContentsView, hiding whatever was
+  // previously active. First call for a sessionId is slow (5-10s typical,
+  // up to 30s) -- main spawns the view, waits for code-server's HTTP port,
+  // and loads the page. Subsequent calls reuse the live webContents,
+  // resolving instantly. Pass null to hide the current view without
+  // showing another. Show a spinner during first-time activation.
+  setActiveView(sessionId: string | null): Promise<void>;
   setViewBounds(sessionId: string, bounds: ViewBounds): Promise<void>;
-  detachView(sessionId: string): Promise<void>;
+  // Permanently destroys the session's view. webContents is closed; future
+  // setActiveView for this sessionId would re-spawn from scratch. Use on
+  // close-tab.
+  closeView(sessionId: string): Promise<void>;
   // Persisted tab list. getWorkspace returns the current snapshot (cheap,
   // in-memory). setTabs / setActive mutate and schedule a debounced disk
   // write; the change is visible immediately on subsequent getWorkspace.
