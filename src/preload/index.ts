@@ -4,6 +4,9 @@ import { IPC, type RendererApi } from "@shared/ipc";
 
 const api: RendererApi = {
   pickFolder: () => ipcRenderer.invoke(IPC.dialogPickFolder),
+  createSession: (cwd) => ipcRenderer.invoke(IPC.sessionCreate, cwd),
+  closeSession: (sessionId) => ipcRenderer.invoke(IPC.sessionClose, sessionId),
+  listSessions: () => ipcRenderer.invoke(IPC.sessionList),
 };
 
 // Puts `api` on the renderer's `window` as `window.api`.

@@ -11,12 +11,7 @@ import { spawn, type ChildProcess } from "child_process";
 import { createServer } from "net";
 import { mkdir } from "fs/promises";
 import { randomUUID } from "crypto";
-
-export interface Session {
-  sessionId: string;
-  port: number;
-  cwd: string;
-}
+import type { Session } from "@shared/ipc";
 
 interface SessionRecord extends Session {
   proc: ChildProcess;

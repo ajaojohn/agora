@@ -11,10 +11,24 @@
 
 export const IPC = {
   dialogPickFolder: "dialog:pickFolder",
+  sessionCreate: "session:create",
+  sessionClose: "session:close",
+  sessionList: "session:list",
 } as const;
 
 export type PickFolderResponse = { path: string } | null;
 
+// One running code-server child as seen by the renderer.
+// `proc` and other internal handles never cross IPC -- only this serializable shape.
+export interface Session {
+  sessionId: string;
+  port: number;
+  cwd: string;
+}
+
 export interface RendererApi {
   pickFolder(): Promise<PickFolderResponse>;
+  createSession(cwd: string): Promise<Session>;
+  closeSession(sessionId: string): Promise<void>;
+  listSessions(): Promise<Session[]>;
 }

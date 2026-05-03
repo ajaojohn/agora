@@ -3,6 +3,7 @@
 import { app, BrowserWindow, dialog } from "electron";
 import { join } from "path";
 import { registerDialogIpc } from "./ipc/dialog";
+import { registerSessionIpc } from "./ipc/session";
 import { locateCodeServer, CodeServerNotFoundError } from "./codeServerLocator";
 import { SessionManager } from "./sessionManager";
 
@@ -40,6 +41,7 @@ async function bootstrap(): Promise<void> {
       codeServerPath,
       userDataDir: join(app.getPath("userData"), "code-server-data"),
     });
+    registerSessionIpc(sessionManager);
     console.log(`[main] code-server resolved at ${codeServerPath}`);
   } catch (err) {
     if (err instanceof CodeServerNotFoundError) {
