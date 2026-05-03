@@ -7,6 +7,10 @@ const api: RendererApi = {
   createSession: (cwd) => ipcRenderer.invoke(IPC.sessionCreate, cwd),
   closeSession: (sessionId) => ipcRenderer.invoke(IPC.sessionClose, sessionId),
   listSessions: () => ipcRenderer.invoke(IPC.sessionList),
+  attachView: (sessionId) => ipcRenderer.invoke(IPC.viewAttach, sessionId),
+  setViewBounds: (sessionId, bounds) =>
+    ipcRenderer.invoke(IPC.viewSetBounds, sessionId, bounds),
+  detachView: (sessionId) => ipcRenderer.invoke(IPC.viewDetach, sessionId),
 };
 
 // Puts `api` on the renderer's `window` as `window.api`.

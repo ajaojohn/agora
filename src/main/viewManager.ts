@@ -12,14 +12,8 @@
 // reach our window.api or any Node primitive. The M2.5 attention extension
 // will talk to main via a separate localhost WebSocket, not the preload bridge.
 import { WebContentsView, type BrowserWindow } from "electron";
+import type { ViewBounds } from "@shared/ipc";
 import { waitForPort } from "./tcpReady";
-
-export interface ViewBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 interface ViewRecord {
   view: WebContentsView;

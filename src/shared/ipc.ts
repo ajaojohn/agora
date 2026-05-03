@@ -14,6 +14,9 @@ export const IPC = {
   sessionCreate: "session:create",
   sessionClose: "session:close",
   sessionList: "session:list",
+  viewAttach: "view:attach",
+  viewSetBounds: "view:setBounds",
+  viewDetach: "view:detach",
 } as const;
 
 export type PickFolderResponse = { path: string } | null;
@@ -26,9 +29,24 @@ export interface Session {
   cwd: string;
 }
 
+// Position + size of a code-server WebContentsView inside the BrowserWindow.
+// Renderer measures its content area (excluding tab bar) and reports here.
+export interface ViewBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface RendererApi {
   pickFolder(): Promise<PickFolderResponse>;
   createSession(cwd: string): Promise<Session>;
   closeSession(sessionId: string): Promise<void>;
   listSessions(): Promise<Session[]>;
+  // Spawns a code-server WebContentsView for an existing session, waits for
+  // the port to be live + the page to render, resolves on success. Slow:
+  // 5-10s typical, can take up to 30s. Show a spinner.
+  attachView(sessionId: string): Promise<void>;
+  setViewBounds(sessionId: string, bounds: ViewBounds): Promise<void>;
+  detachView(sessionId: string): Promise<void>;
 }
