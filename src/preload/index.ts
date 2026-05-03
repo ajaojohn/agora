@@ -16,6 +16,7 @@ const api: RendererApi = {
   setWorkspaceTabs: (tabs) => ipcRenderer.invoke(IPC.workspaceSetTabs, tabs),
   setWorkspaceActive: (activeId) =>
     ipcRenderer.invoke(IPC.workspaceSetActive, activeId),
+  cwdExists: (cwd) => ipcRenderer.invoke(IPC.cwdExists, cwd),
 };
 
 // Puts `api` on the renderer's `window` as `window.api`.

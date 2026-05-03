@@ -22,6 +22,7 @@ export const IPC = {
   workspaceGet: "workspace:get",
   workspaceSetTabs: "workspace:setTabs",
   workspaceSetActive: "workspace:setActive",
+  cwdExists: "cwd:exists",
 } as const;
 
 export type PickFolderResponse = { path: string } | null;
@@ -88,4 +89,8 @@ export interface RendererApi {
   getWorkspace(): Promise<Workspace>;
   setWorkspaceTabs(tabs: Tab[]): Promise<void>;
   setWorkspaceActive(activeId: string | null): Promise<void>;
+  // Server-side fs.access check. Used by the renderer's spawn flow to give
+  // a clearer "Folder no longer exists" error before attempting a code-
+  // server spawn that would fail anyway.
+  cwdExists(cwd: string): Promise<boolean>;
 }

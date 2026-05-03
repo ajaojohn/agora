@@ -63,6 +63,11 @@ body,
   font-size: 12px;
 }
 
+.error-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* Reserves where the WebContentsView is painted. The view is on a
    separate compositor layer above this div; the div itself stays empty. */
 .view-host {

@@ -57,19 +57,39 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Spawn a tab: createSession + setActiveView. Updates perTabState through
-  // each phase. Catches anywhere -> error state.
+  // Spawn a tab: pre-check cwd existence, then createSession + setActiveView.
+  // Updates perTabState through each phase. cwd-vanished gets a clearer
+  // message (Q14 cwd-vanished special case). If createSession succeeds but
+  // setActiveView fails, we close the orphan session before throwing so a
+  // retry doesn't leak code-server children.
   async function spawn(tab: Tab): Promise<void> {
     setPerTabState((prev) =>
       new Map(prev).set(tab.id, { kind: "loading" }),
     );
+
+    if (!(await window.api.cwdExists(tab.cwd))) {
+      setPerTabState((prev) =>
+        new Map(prev).set(tab.id, {
+          kind: "error",
+          message: `Folder no longer exists at ${tab.cwd}`,
+        }),
+      );
+      return;
+    }
+
+    let session: Session | null = null;
     try {
-      const session = await window.api.createSession(tab.cwd);
+      session = await window.api.createSession(tab.cwd);
       await window.api.setActiveView(session.sessionId);
       setPerTabState((prev) =>
-        new Map(prev).set(tab.id, { kind: "loaded", session }),
+        new Map(prev).set(tab.id, { kind: "loaded", session: session! }),
       );
     } catch (err) {
+      if (session) {
+        await window.api.closeSession(session.sessionId).catch(() => {
+          // best-effort -- if cleanup fails the child will be killed at app quit anyway
+        });
+      }
       const message = err instanceof Error ? err.message : String(err);
       setPerTabState((prev) =>
         new Map(prev).set(tab.id, { kind: "error", message }),
@@ -115,12 +135,6 @@ export function App() {
     await window.api.setWorkspaceTabs(nextTabs);
     await window.api.setWorkspaceActive(tab.id);
     await spawn(tab);
-  }
-
-  function reset(): void {
-    setActiveId(null);
-    void window.api.setWorkspaceActive(null);
-    void window.api.setActiveView(null);
   }
 
   // Close-tab: destroy view + kill code-server, remove from list, switch
@@ -193,7 +207,17 @@ export function App() {
           <Active session={activeState.session} />
         )}
         {activeId !== null && activeState && typeof activeState === "object" && activeState.kind === "error" && (
-          <ErrorView message={activeState.message} onRetry={reset} />
+          <ErrorView
+            message={activeState.message}
+            onRetry={() => {
+              const tab = tabs.find((t) => t.id === activeId);
+              if (tab) void spawn(tab);
+            }}
+            onClose={() => {
+              const tab = tabs.find((t) => t.id === activeId);
+              if (tab) void close(tab);
+            }}
+          />
         )}
       </div>
     </div>
@@ -238,15 +262,20 @@ function Loading({
 function ErrorView({
   message,
   onRetry,
+  onClose,
 }: {
   message: string;
   onRetry: () => void;
+  onClose: () => void;
 }) {
   return (
     <div className="error">
       <h1>Couldn't open session</h1>
       <p className="error-message">{message}</p>
-      <button onClick={onRetry}>Try again</button>
+      <div className="error-actions">
+        <button onClick={onRetry}>Try again</button>
+        <button onClick={onClose}>Close tab</button>
+      </div>
     </div>
   );
 }
