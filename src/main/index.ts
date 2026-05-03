@@ -1,7 +1,7 @@
-// Main process entry. Owns app lifecycle, the BrowserWindow, the
-// SessionManager that supervises code-server child processes, the
-// ViewManager that hosts each session's WebContentsView, and the
-// WorkspaceStore that persists the tab list across launches.
+// Main process entry. Owns app lifecycle, the BrowserWindow, the SHARED
+// code-server SessionManager, the ViewManager that hosts each tab's
+// WebContentsView, and the WorkspaceStore that persists tab list + the
+// chosen code-server port across launches.
 import { app, BrowserWindow, dialog } from "electron";
 import { join } from "path";
 import { registerDialogIpc } from "./ipc/dialog";
@@ -9,7 +9,7 @@ import { registerSessionIpc } from "./ipc/session";
 import { registerViewIpc } from "./ipc/view";
 import { registerWorkspaceIpc } from "./ipc/workspace";
 import { locateCodeServer, CodeServerNotFoundError } from "./codeServerLocator";
-import { SessionManager } from "./sessionManager";
+import { SessionManager, pickStablePort } from "./sessionManager";
 import { ViewManager } from "./viewManager";
 import { WorkspaceStore } from "./workspaceStore";
 import { seedUserDataDir } from "./userDataSeeder";
@@ -47,36 +47,59 @@ async function bootstrap(): Promise<void> {
       app.getPath("userData"),
       "code-server-data",
     );
-    // Seed default settings.json (theme) before SessionManager can spawn
-    // any code-server child. Only runs on first launch -- subsequent runs
-    // see the file already exists and skip.
+    // Seed default settings.json (theme) before code-server reads it.
     await seedUserDataDir(codeServerUserDataDir);
-    sessionManager = new SessionManager({
-      codeServerPath,
-      userDataDir: codeServerUserDataDir,
-    });
-    viewManager = new ViewManager();
+
+    // Workspace must load BEFORE pickStablePort so the persisted port is
+    // visible. WorkspaceStore.set during pickStablePort schedules a
+    // debounced write of the (possibly new) port; before-quit flushes it.
     workspaceStore = new WorkspaceStore(
       join(app.getPath("userData"), "workspace.json"),
     );
     const workspace = await workspaceStore.load();
+
+    const port = await pickStablePort(workspace, (next) =>
+      workspaceStore!.set(next),
+    );
+    // Force the (possibly new) port to disk before code-server starts using
+    // it -- otherwise an early crash within the 500ms debounce window would
+    // lose the port choice and orphan all the workspaceStorage entries.
+    await workspaceStore.flush();
+
+    sessionManager = new SessionManager({
+      codeServerPath,
+      userDataDir: codeServerUserDataDir,
+      port,
+    });
+    viewManager = new ViewManager();
+
+    console.log(`[main] code-server resolved at ${codeServerPath}`);
+    console.log(`[main] starting shared code-server on port ${port}...`);
+    await sessionManager.start();
+    console.log(`[main] code-server ready`);
+    console.log(
+      `[main] workspace loaded: ${workspace.tabs.length} tab(s), activeId=${workspace.activeId}`,
+    );
+
     registerDialogIpc();
     registerSessionIpc(sessionManager);
     registerViewIpc(viewManager, sessionManager);
     registerWorkspaceIpc(workspaceStore);
-    console.log(`[main] code-server resolved at ${codeServerPath}`);
-    console.log(
-      `[main] workspace loaded: ${workspace.tabs.length} tab(s), activeId=${workspace.activeId}`,
-    );
   } catch (err) {
     if (err instanceof CodeServerNotFoundError) {
-      // Show a blocking error dialog so the missing-dep state is impossible to miss.
-      // Replaced by an in-app empty state once the renderer can render one (M1 commit 10).
       dialog.showErrorBox("code-server not found", err.message);
       app.quit();
       return;
     }
-    throw err;
+    // Surface other startup failures (port conflict, code-server crash on
+    // launch, readiness timeout) without leaving the user staring at a
+    // blank Electron window.
+    dialog.showErrorBox(
+      "Failed to start code-server",
+      err instanceof Error ? err.message : String(err),
+    );
+    app.quit();
+    return;
   }
 
   createWindow();

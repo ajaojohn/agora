@@ -56,11 +56,15 @@ export const TabSchema = z.object({
 export type Tab = z.infer<typeof TabSchema>;
 
 // Top-level shape of workspace.json. `activeId` is the tab the user was
-// last on -- bootstrap respawns this one eagerly. Null means no active tab
-// (cold launch with empty list, or user closed the last tab before quit).
+// last on -- bootstrap respawns this one eagerly. Null means no active tab.
+// `codeServerPort` is the port the shared code-server bound to last time;
+// reusing it across launches keeps the workspace URI stable so VS Code's
+// per-workspace state (open editors, panel sizes, sidebar widths) actually
+// persists. Optional because cold launch hasn't picked one yet.
 export const WorkspaceSchema = z.object({
   tabs: z.array(TabSchema),
   activeId: z.string().nullable(),
+  codeServerPort: z.number().int().positive().optional(),
 });
 export type Workspace = z.infer<typeof WorkspaceSchema>;
 

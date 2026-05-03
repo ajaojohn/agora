@@ -1,98 +1,114 @@
-// Owns the lifecycle of code-server child processes.
+// Owns the SHARED code-server process. Multi-tab UI loads
+// http://127.0.0.1:<sharedPort>/?folder=<cwd> with different cwds, so all
+// tabs share one VS Code server but identify their own workspace via the
+// folder query param. Stable port across launches (see pickStablePort) =
+// stable workspace URI = stable workspace identity = persisted state.
 //
-// One SessionManager per app. Each session = one cwd + one code-server child
-// bound to a unique localhost port. The renderer (M1: empty state, M2+: tabs)
-// asks the manager to create/close sessions via IPC; the manager hides the
-// process bookkeeping.
+// Each "session" is a logical record { sessionId, port, cwd } -- create()
+// no longer spawns anything, just registers the tab. The shared process
+// is spawned once at app bootstrap via start() and torn down at quit via
+// disposeAll().
 //
-// Bound to 127.0.0.1 with --auth none. Loopback-only is the only thing keeping
-// an unauthenticated VS Code off the LAN — never bind to 0.0.0.0.
+// Bound to 127.0.0.1 with --auth none. Loopback-only is the only thing
+// keeping an unauthenticated VS Code off the LAN -- never bind to 0.0.0.0.
 import { spawn, type ChildProcess } from "child_process";
 import { createServer } from "net";
 import { mkdir } from "fs/promises";
 import { randomUUID } from "crypto";
-import type { Session } from "@shared/ipc";
+import type { Session, Workspace } from "@shared/ipc";
+import { waitForPort } from "./tcpReady";
 
-interface SessionRecord extends Session {
-  proc: ChildProcess;
-}
+interface SessionRecord extends Session {}
 
 export interface SessionManagerOptions {
-  // Absolute path to the code-server binary, resolved by codeServerLocator.
   codeServerPath: string;
-  // Shared user-data-dir for every session. Created lazily on first spawn.
   userDataDir: string;
+  // Resolved by pickStablePort before construction.
+  port: number;
 }
 
 export class SessionManager {
   private readonly sessions = new Map<string, SessionRecord>();
+  private proc: ChildProcess | null = null;
   private userDataDirReady = false;
 
   constructor(private readonly opts: SessionManagerOptions) {}
 
-  async create(cwd: string): Promise<Session> {
+  // Spawns the shared code-server and waits for its HTTP port to accept
+  // connections. Call once at app bootstrap. Subsequent calls are no-ops.
+  // Throws if the process exits before the port comes up, or if waitForPort
+  // times out (~30s).
+  async start(): Promise<void> {
+    if (this.proc) return;
+
     await this.ensureUserDataDir();
 
-    const sessionId = randomUUID();
-    const port = await pickFreePort();
-
-    const proc = spawn(
+    this.proc = spawn(
       this.opts.codeServerPath,
       [
         "--auth",
         "none",
         "--bind-addr",
-        `127.0.0.1:${port}`,
+        `127.0.0.1:${this.opts.port}`,
         "--user-data-dir",
         this.opts.userDataDir,
         "--disable-telemetry",
-        cwd,
       ],
       {
         stdio: ["ignore", "pipe", "pipe"],
-        // Detach from parent's controlling terminal; we kill explicitly on dispose.
         detached: false,
       },
     );
 
-    proc.on("exit", (code, signal) => {
-      // If the child dies on its own (crash, OOM, manual kill), drop the record
-      // so a later close() doesn't try to signal a dead pid.
-      this.sessions.delete(sessionId);
-      console.log(`[session ${sessionId}] code-server exited code=${code} signal=${signal}`);
+    this.proc.on("exit", (code, signal) => {
+      console.error(
+        `[sessionManager] shared code-server exited code=${code} signal=${signal}`,
+      );
+      this.proc = null;
+      // M1: no auto-restart. Subsequent create() calls will throw with a
+      // user-visible message, surfaced via the renderer's error UI. User
+      // must restart Agora.
     });
 
-    // For now, surface child output on the main process console for debugging.
-    // Will be replaced by an attention-detection pipe in M2.5.
-    proc.stdout?.on("data", (chunk) => process.stdout.write(`[cs ${port}] ${chunk}`));
-    proc.stderr?.on("data", (chunk) => process.stderr.write(`[cs ${port}] ${chunk}`));
+    this.proc.stdout?.on("data", (chunk) =>
+      process.stdout.write(`[cs] ${chunk}`),
+    );
+    this.proc.stderr?.on("data", (chunk) =>
+      process.stderr.write(`[cs] ${chunk}`),
+    );
 
-    const record: SessionRecord = { sessionId, port, cwd, proc };
-    this.sessions.set(sessionId, record);
-
-    return { sessionId, port, cwd };
+    await waitForPort(this.opts.port);
   }
 
-  async close(sessionId: string): Promise<void> {
-    const record = this.sessions.get(sessionId);
-    if (!record) return;
+  // Registers a logical session for `cwd`. No process spawn -- the shared
+  // code-server already handles all cwds via the URL query param.
+  // Throws if the shared server isn't running (e.g. crashed mid-session).
+  create(cwd: string): Session {
+    if (!this.proc) {
+      throw new Error("code-server is not running. Restart Agora.");
+    }
+    const sessionId = randomUUID();
+    const session: Session = { sessionId, port: this.opts.port, cwd };
+    this.sessions.set(sessionId, session);
+    return session;
+  }
 
+  close(sessionId: string): void {
     this.sessions.delete(sessionId);
-    await terminate(record.proc);
+    // Process kept alive for other tabs.
   }
 
   list(): Session[] {
-    return [...this.sessions.values()].map(({ sessionId, port, cwd }) => ({
-      sessionId,
-      port,
-      cwd,
-    }));
+    return [...this.sessions.values()];
   }
 
   async disposeAll(): Promise<void> {
-    const records = [...this.sessions.values()];
     this.sessions.clear();
-    await Promise.all(records.map((r) => terminate(r.proc)));
+    if (this.proc) {
+      const proc = this.proc;
+      this.proc = null;
+      await terminate(proc);
+    }
   }
 
   private async ensureUserDataDir(): Promise<void> {
@@ -102,9 +118,24 @@ export class SessionManager {
   }
 }
 
-// Asks the OS for a free port by binding an ephemeral server on port 0,
-// reading the assigned port, and closing the server. Tiny race window
-// between close() and code-server bind() — acceptable on localhost.
+// Resolves the port to use for the shared code-server. Reuses a previously-
+// saved port from workspace.json if it's still free, else picks fresh and
+// persists the new value. The port has to be stable across launches so VS
+// Code's workspace URI (which includes the port) hashes consistently and
+// workspaceStorage state survives.
+export async function pickStablePort(
+  ws: Workspace,
+  saveBack: (next: Workspace) => void,
+): Promise<number> {
+  if (ws.codeServerPort && (await isPortFree(ws.codeServerPort))) {
+    return ws.codeServerPort;
+  }
+  const port = await pickFreePort();
+  saveBack({ ...ws, codeServerPort: port });
+  return port;
+}
+
+// Asks the OS for a free port by binding an ephemeral server on port 0.
 function pickFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer();
@@ -123,8 +154,20 @@ function pickFreePort(): Promise<number> {
   });
 }
 
-// Sends SIGTERM, escalates to SIGKILL if the child hasn't exited within 2s.
-// SIGTERM lets code-server flush state; SIGKILL is the hammer.
+// Probe: try to bind the named port. If it succeeds, port is free.
+function isPortFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.unref();
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+// SIGTERM with 2s SIGKILL escalation -- gives code-server time to flush
+// per-workspace storage to SQLite before exit.
 function terminate(proc: ChildProcess): Promise<void> {
   return new Promise((resolve) => {
     if (proc.exitCode !== null || proc.signalCode !== null) {
