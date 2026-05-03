@@ -1,50 +1,150 @@
-// Top-level component. M1 single-session shell:
-//   empty -> pickFolder -> createSession -> attachView -> active
-// State is a discriminated union so each branch renders its own UI without
-// a sea of nullable fields. Multi-session shell with a tab bar lands in M2.
-import { useLayoutEffect, useRef, useState } from "react";
-import type { Session } from "@shared/ipc";
+// Top-level component. Multi-tab state shape, single-pane UI for now --
+// tab bar component lands in commit 15.
+//
+// Two ID concepts deliberately kept separate:
+//   tab.id        -- persisted UUID, stable across app launches, lives in
+//                    workspace.json. Renderer thinks in these.
+//   session.id    -- runtime UUID from createSession, regenerated on each
+//                    spawn. Only the spawn flow + view IPC need it.
+//
+// State machine for each tab:
+//   unspawned     -- in workspace.json but no code-server running. Lazy.
+//   loading       -- spawn flow in flight (createSession + setActiveView).
+//   loaded        -- code-server up, view attached, session in hand.
+//   error         -- spawn or load failed. Tab stays in list; retry via
+//                    re-activating.
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { Session, Tab } from "@shared/ipc";
 
-type State =
-  | { kind: "empty" }
-  | { kind: "loading"; phase: "starting" | "attaching"; cwd: string }
-  | { kind: "active"; session: Session }
+type TabState =
+  | "unspawned"
+  | { kind: "loading" }
+  | { kind: "loaded"; session: Session }
   | { kind: "error"; message: string };
 
 export function App() {
-  const [state, setState] = useState<State>({ kind: "empty" });
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [perTabState, setPerTabState] = useState<Map<string, TabState>>(
+    () => new Map(),
+  );
 
-  async function open(): Promise<void> {
-    const folder = await window.api.pickFolder();
-    if (!folder) return;
-    setState({ kind: "loading", phase: "starting", cwd: folder.path });
+  // Mount: hydrate from persisted workspace, then spawn the previously-active
+  // tab eagerly (hybrid spawn -- other tabs stay unspawned until clicked).
+  useEffect(() => {
+    let cancelled = false;
+    async function init() {
+      const ws = await window.api.getWorkspace();
+      if (cancelled) return;
+      setTabs(ws.tabs);
+      setActiveId(ws.activeId);
+      setPerTabState(() => {
+        const initial = new Map<string, TabState>();
+        for (const tab of ws.tabs) initial.set(tab.id, "unspawned");
+        return initial;
+      });
+      if (ws.activeId) {
+        const tab = ws.tabs.find((t) => t.id === ws.activeId);
+        if (tab) await spawn(tab);
+      }
+    }
+    init();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Spawn a tab: createSession + setActiveView. Updates perTabState through
+  // each phase. Catches anywhere -> error state.
+  async function spawn(tab: Tab): Promise<void> {
+    setPerTabState((prev) =>
+      new Map(prev).set(tab.id, { kind: "loading" }),
+    );
     try {
-      const session = await window.api.createSession(folder.path);
-      setState({ kind: "loading", phase: "attaching", cwd: folder.path });
+      const session = await window.api.createSession(tab.cwd);
       await window.api.setActiveView(session.sessionId);
-      setState({ kind: "active", session });
+      setPerTabState((prev) =>
+        new Map(prev).set(tab.id, { kind: "loaded", session }),
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setState({ kind: "error", message });
+      setPerTabState((prev) =>
+        new Map(prev).set(tab.id, { kind: "error", message }),
+      );
     }
   }
 
-  function reset(): void {
-    setState({ kind: "empty" });
+  // Make `tab` the active tab. If already loaded, reuses the live view via
+  // setActiveView (instant). If unspawned (lazy from persistence) or in
+  // error state, re-runs spawn flow.
+  async function activate(tab: Tab): Promise<void> {
+    setActiveId(tab.id);
+    await window.api.setWorkspaceActive(tab.id);
+    const state = perTabState.get(tab.id);
+    if (state && typeof state === "object" && state.kind === "loaded") {
+      await window.api.setActiveView(state.session.sessionId);
+    } else if (state === "unspawned" || (state && typeof state === "object" && state.kind === "error")) {
+      await spawn(tab);
+    }
+    // loading: no-op, the in-flight spawn will land in loaded/error.
   }
+
+  // Open Folder flow: pick a cwd, dedupe against existing tabs (Q12 -- pick
+  // the same project twice = activate existing, no new spawn), else create
+  // a new tab and spawn it.
+  async function open(): Promise<void> {
+    const folder = await window.api.pickFolder();
+    if (!folder) return;
+    const existing = tabs.find((t) => t.cwd === folder.path);
+    if (existing) {
+      await activate(existing);
+      return;
+    }
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      cwd: folder.path,
+      order: tabs.length,
+    };
+    const nextTabs = [...tabs, tab];
+    setTabs(nextTabs);
+    setActiveId(tab.id);
+    setPerTabState((prev) => new Map(prev).set(tab.id, "unspawned"));
+    await window.api.setWorkspaceTabs(nextTabs);
+    await window.api.setWorkspaceActive(tab.id);
+    await spawn(tab);
+  }
+
+  function reset(): void {
+    setActiveId(null);
+    void window.api.setWorkspaceActive(null);
+    void window.api.setActiveView(null);
+  }
+
+  const activeState =
+    activeId !== null ? perTabState.get(activeId) ?? null : null;
 
   return (
     <div className="app">
-      {state.kind === "empty" && <Empty onOpen={open} />}
-      {state.kind === "loading" && (
-        <Loading phase={state.phase} cwd={state.cwd} />
+      {activeId === null && <Empty onOpen={open} />}
+      {activeId !== null && activeState === "unspawned" && (
+        <Loading phase="starting" cwd={cwdFor(tabs, activeId)} />
       )}
-      {state.kind === "active" && <Active session={state.session} />}
-      {state.kind === "error" && (
-        <ErrorView message={state.message} onRetry={reset} />
+      {activeId !== null && activeState && typeof activeState === "object" && activeState.kind === "loading" && (
+        <Loading phase="attaching" cwd={cwdFor(tabs, activeId)} />
+      )}
+      {activeId !== null && activeState && typeof activeState === "object" && activeState.kind === "loaded" && (
+        <Active session={activeState.session} />
+      )}
+      {activeId !== null && activeState && typeof activeState === "object" && activeState.kind === "error" && (
+        <ErrorView message={activeState.message} onRetry={reset} />
       )}
     </div>
   );
+}
+
+function cwdFor(tabs: Tab[], id: string): string {
+  return tabs.find((t) => t.id === id)?.cwd ?? "";
 }
 
 function Empty({ onOpen }: { onOpen: () => void }) {
