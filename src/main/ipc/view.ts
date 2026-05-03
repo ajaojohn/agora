@@ -26,12 +26,13 @@ export function registerViewIpc(
         throw new Error("No parent window for IPC sender");
       }
 
-      // For null (hide current) we don't need a port. For a real sessionId
-      // we look up its port even if ViewManager already has the view --
-      // ViewManager ignores port when not first-time, so passing it is
-      // harmless and means we never have to track which sessions have
-      // been attached.
+      // For null (hide current) we don't need port/cwd. For a real
+      // sessionId we look these up even if ViewManager already has the
+      // view -- ViewManager ignores them when not first-time, so passing
+      // them is harmless and means we never have to track which sessions
+      // have been attached.
       let port: number | undefined;
+      let cwd: string | undefined;
       if (sessionId !== null) {
         const session = sessionManager
           .list()
@@ -40,9 +41,10 @@ export function registerViewIpc(
           throw new Error(`Unknown session: ${sessionId}`);
         }
         port = session.port;
+        cwd = session.cwd;
       }
 
-      await viewManager.setActive(sessionId, parent, port);
+      await viewManager.setActive(sessionId, parent, port, cwd);
     },
   );
 

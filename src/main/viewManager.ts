@@ -42,13 +42,17 @@ export class ViewManager {
   // creates+loads+shows a new one. Pass null to hide the current view
   // without showing anything.
   //
-  // `port` is required only the first time a sessionId is set active --
-  // subsequent calls reuse the existing view. Caller (ipc/view.ts) can
-  // safely pass it every time; it's ignored if the view already exists.
+  // `port` and `cwd` are required only the first time a sessionId is set
+  // active -- subsequent calls reuse the existing view. Caller (ipc/view.ts)
+  // can safely pass them every time; they're ignored if the view already
+  // exists. cwd is needed for the URL's ?folder= query param so code-server
+  // opens the right project (without it, VS Code restores last-opened from
+  // the shared user-data-dir).
   async setActive(
     sessionId: string | null,
     parent: BrowserWindow,
     port?: number,
+    cwd?: string,
   ): Promise<void> {
     if (this.activeSessionId === sessionId) return; // no-op for same target
 
@@ -70,12 +74,12 @@ export class ViewManager {
     // Lazy first-attach: create view + load URL if we've never seen this
     // sessionId before.
     if (!this.views.has(sessionId)) {
-      if (port === undefined) {
+      if (port === undefined || cwd === undefined) {
         throw new Error(
-          `setActive(${sessionId}): port required for first-time attach`,
+          `setActive(${sessionId}): port + cwd required for first-time attach`,
         );
       }
-      await this.attachInternal(sessionId, port);
+      await this.attachInternal(sessionId, port, cwd);
     }
 
     // Show: add to parent's contentView with default bounds (renderer will
@@ -119,9 +123,15 @@ export class ViewManager {
   // Creates the view and loads the URL but does NOT add to any parent's
   // contentView. Caller (setActive) handles attaching after this resolves.
   // Rolls back the map entry on load failure so a retry is a fresh attempt.
+  //
+  // The ?folder= query param forces VS Code to open `cwd` regardless of
+  // its restore-last-workspace state. Without this, the shared
+  // --user-data-dir means every fresh code-server opens whatever folder
+  // was last opened in any session.
   private async attachInternal(
     sessionId: string,
     port: number,
+    cwd: string,
   ): Promise<void> {
     await waitForPort(port);
 
@@ -135,8 +145,9 @@ export class ViewManager {
 
     this.views.set(sessionId, { view, parent: null });
 
+    const url = `http://127.0.0.1:${port}/?folder=${encodeURIComponent(cwd)}`;
     try {
-      await loadAndAwait(view, `http://127.0.0.1:${port}`, sessionId);
+      await loadAndAwait(view, url, sessionId);
     } catch (err) {
       this.views.delete(sessionId);
       view.webContents.close();
