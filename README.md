@@ -2,7 +2,6 @@
 
 macOS multi-tab IDE host for running CLI coding agents in parallel across many projects.
 
-<!-- Demo GIF: replace with real recording when available -->
 <p align="center">
   <img width="1724" height="980" alt="agora readme gif" src="https://github.com/user-attachments/assets/9f033273-637a-46dd-9326-8904d6b61287" />
 </p>
