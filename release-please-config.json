@@ -5,6 +5,7 @@
       "release-type": "node",
       "package-name": "agora",
       "include-v-in-tag": true,
+      "include-component-in-tag": false,
       "draft": false,
       "prerelease": false,
       "changelog-sections": [
