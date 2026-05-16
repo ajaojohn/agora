@@ -14,3 +14,6 @@ release
 # settings live in .claude/settings.json which IS tracked.
 .claude/settings.local.json
 .claude/worktrees/
+
+# Local scratch / manual test fixtures
+scratch/

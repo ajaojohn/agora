@@ -13,7 +13,7 @@
 // with sandbox: true, contextIsolation: true, no preload -- they cannot
 // reach our window.api or any Node primitive. The M2 attention extension
 // will talk to main via a separate localhost WebSocket, not the preload bridge.
-import { WebContentsView, type BrowserWindow } from "electron";
+import { shell, WebContentsView, type BrowserWindow } from "electron";
 import type { ViewBounds } from "@shared/ipc";
 import { waitForPort } from "./tcpReady";
 
@@ -145,6 +145,19 @@ export class ViewManager {
         contextIsolation: true,
         nodeIntegration: false,
       },
+    });
+
+    // Route external link clicks (target=_blank, window.open, Cmd+click
+    // in editor/terminal, markdown preview links) to the user's default
+    // browser instead of letting Electron pop a bare browser window.
+    // Returning 'deny' suppresses the popup; shell.openExternal hands the
+    // URL off to the OS. We do not filter protocols here -- VS Code
+    // Desktop does not either, and code-server's workbench already shows
+    // its own trusted-domains prompt for non-trusted external URLs before
+    // the click reaches us.
+    view.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
+      void shell.openExternal(targetUrl);
+      return { action: "deny" };
     });
 
     this.views.set(sessionId, { view, parent: null });
