@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/ajaojohn/agora/compare/v0.1.1...v0.1.2) (2026-05-16)
+
+
+### Bug Fixes
+
+* use vX.Y.Z tag format so electron-builder finds the release ([#10](https://github.com/ajaojohn/agora/issues/10)) ([2c29c99](https://github.com/ajaojohn/agora/commit/2c29c99befa9d1eac2c593f823343057fcf57024))
+
 ## [0.1.1](https://github.com/ajaojohn/agora/compare/agora-v0.1.0...agora-v0.1.1) (2026-05-16)
 
 
