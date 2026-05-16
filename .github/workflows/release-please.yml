@@ -20,8 +20,6 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         id: rp
-        # Skip on manual dispatch -- we only want the build job to run.
-        if: github.event_name != 'workflow_dispatch'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
@@ -29,7 +27,7 @@ jobs:
 
   build-mac:
     needs: release-please
-    if: needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.release-please.outputs.release_created == 'true'
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
