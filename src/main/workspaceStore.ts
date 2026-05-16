@@ -9,11 +9,7 @@
 // back to EMPTY_WORKSPACE -- the user gets a fresh start rather than a
 // crash. The original file is preserved at <path>.corrupt for postmortem.
 import { readFile, writeFile, rename } from "fs/promises";
-import {
-  EMPTY_WORKSPACE,
-  WorkspaceSchema,
-  type Workspace,
-} from "@shared/ipc";
+import { EMPTY_WORKSPACE, WorkspaceSchema, type Workspace } from "@shared/ipc";
 
 const DEBOUNCE_MS = 500;
 

@@ -14,7 +14,7 @@ A macOS Electron desktop app. Each tab embeds a full VS Code instance via [code-
 
 Surface the technical details and tradeoffs behind non-trivial choices — don't just state the outcome. When picking a library, shaping an IPC channel, or making a lifecycle / security / performance tradeoff, explain the reasoning and the cost so the user understands the decision, not just the result. Flag considerations they may not see (e.g. "this means PTY bytes bypass React state", "this ships separate arm64/x64 dmgs instead of a universal").
 
-**Be willing to be adversarial.** If the user proposes something you think is wrong, weakly reasoned, or storing up problems, say so plainly and argue the case before you implement. Push back on premises, flag risks, and offer the counter-view — agreeing reflexively is a failure mode, not politeness. The user wants a collaborator who'll challenge bad ideas early, not one who executes smoothly and leaves them to discover the cost later. Default to teaching *and* disagreeing alongside executing.
+**Be willing to be adversarial.** If the user proposes something you think is wrong, weakly reasoned, or storing up problems, say so plainly and argue the case before you implement. Push back on premises, flag risks, and offer the counter-view — agreeing reflexively is a failure mode, not politeness. The user wants a collaborator who'll challenge bad ideas early, not one who executes smoothly and leaves them to discover the cost later. Default to teaching _and_ disagreeing alongside executing.
 
 ## Commands
 

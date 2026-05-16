@@ -25,12 +25,12 @@ Agora collapses both into one window. Each tab is `(cwd + agent + IDE)`. Project
 
 ## Status
 
-| Milestone | Status | What ships |
-|---|---|---|
-| M1 — multi-tab daily-driver | In progress | Tab bar, per-tab code-server, persistent workspace, lazy spawn |
-| M2 — attention detection | Planned | `agora-helper` extension, per-tab indicators, macOS notifications, dock badge |
-| M3 — polish | Planned | Settings UI, tab reorder/rename, prewarm pool |
-| M4 — packaging | Planned | Signed/notarized dmg, auto-update |
+| Milestone                   | Status      | What ships                                                                    |
+| --------------------------- | ----------- | ----------------------------------------------------------------------------- |
+| M1 — multi-tab daily-driver | In progress | Tab bar, per-tab code-server, persistent workspace, lazy spawn                |
+| M2 — attention detection    | Planned     | `agora-helper` extension, per-tab indicators, macOS notifications, dock badge |
+| M3 — polish                 | Planned     | Settings UI, tab reorder/rename, prewarm pool                                 |
+| M4 — packaging              | Planned     | Signed/notarized dmg, auto-update                                             |
 
 See [`.plan/roadmap.md`](.plan/roadmap.md) for the full roadmap and [`.plan/vision.md`](.plan/vision.md) for the product thesis.
 

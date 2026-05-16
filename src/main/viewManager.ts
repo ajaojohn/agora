@@ -26,7 +26,9 @@ interface ViewRecord {
 
 export class ViewLoadError extends Error {
   constructor(sessionId: string, reason: string) {
-    super(`Failed to load code-server view for session ${sessionId}: ${reason}`);
+    super(
+      `Failed to load code-server view for session ${sessionId}: ${reason}`,
+    );
     this.name = "ViewLoadError";
   }
 }
@@ -189,7 +191,9 @@ function loadAndAwait(
       isMainFrame: boolean,
     ): void => {
       if (!isMainFrame) return;
-      finish(new ViewLoadError(sessionId, `${errorDescription} (${errorCode})`));
+      finish(
+        new ViewLoadError(sessionId, `${errorDescription} (${errorCode})`),
+      );
     };
 
     view.webContents.on("did-finish-load", onLoad);

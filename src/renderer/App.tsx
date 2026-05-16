@@ -63,9 +63,7 @@ export function App() {
   // setActiveView fails, we close the orphan session before throwing so a
   // retry doesn't leak code-server children.
   async function spawn(tab: Tab): Promise<void> {
-    setPerTabState((prev) =>
-      new Map(prev).set(tab.id, { kind: "loading" }),
-    );
+    setPerTabState((prev) => new Map(prev).set(tab.id, { kind: "loading" }));
 
     if (!(await window.api.cwdExists(tab.cwd))) {
       setPerTabState((prev) =>
@@ -106,7 +104,10 @@ export function App() {
     const state = perTabState.get(tab.id);
     if (state && typeof state === "object" && state.kind === "loaded") {
       await window.api.setActiveView(state.session.sessionId);
-    } else if (state === "unspawned" || (state && typeof state === "object" && state.kind === "error")) {
+    } else if (
+      state === "unspawned" ||
+      (state && typeof state === "object" && state.kind === "error")
+    ) {
       await spawn(tab);
     }
     // loading: no-op, the in-flight spawn will land in loaded/error.
@@ -144,7 +145,7 @@ export function App() {
     const idx = tabs.findIndex((t) => t.id === tab.id);
     const wasActive = activeId === tab.id;
     const nextActive: string | null = wasActive
-      ? tabs[idx + 1]?.id ?? tabs[idx - 1]?.id ?? null
+      ? (tabs[idx + 1]?.id ?? tabs[idx - 1]?.id ?? null)
       : activeId;
 
     const state = perTabState.get(tab.id);
@@ -183,7 +184,7 @@ export function App() {
   }, [activeId, tabs]);
 
   const activeState =
-    activeId !== null ? perTabState.get(activeId) ?? null : null;
+    activeId !== null ? (perTabState.get(activeId) ?? null) : null;
 
   return (
     <div className="app">
@@ -200,25 +201,34 @@ export function App() {
         {activeId !== null && activeState === "unspawned" && (
           <Loading phase="starting" cwd={cwdFor(tabs, activeId)} />
         )}
-        {activeId !== null && activeState && typeof activeState === "object" && activeState.kind === "loading" && (
-          <Loading phase="attaching" cwd={cwdFor(tabs, activeId)} />
-        )}
-        {activeId !== null && activeState && typeof activeState === "object" && activeState.kind === "loaded" && (
-          <Active session={activeState.session} />
-        )}
-        {activeId !== null && activeState && typeof activeState === "object" && activeState.kind === "error" && (
-          <ErrorView
-            message={activeState.message}
-            onRetry={() => {
-              const tab = tabs.find((t) => t.id === activeId);
-              if (tab) void spawn(tab);
-            }}
-            onClose={() => {
-              const tab = tabs.find((t) => t.id === activeId);
-              if (tab) void close(tab);
-            }}
-          />
-        )}
+        {activeId !== null &&
+          activeState &&
+          typeof activeState === "object" &&
+          activeState.kind === "loading" && (
+            <Loading phase="attaching" cwd={cwdFor(tabs, activeId)} />
+          )}
+        {activeId !== null &&
+          activeState &&
+          typeof activeState === "object" &&
+          activeState.kind === "loaded" && (
+            <Active session={activeState.session} />
+          )}
+        {activeId !== null &&
+          activeState &&
+          typeof activeState === "object" &&
+          activeState.kind === "error" && (
+            <ErrorView
+              message={activeState.message}
+              onRetry={() => {
+                const tab = tabs.find((t) => t.id === activeId);
+                if (tab) void spawn(tab);
+              }}
+              onClose={() => {
+                const tab = tabs.find((t) => t.id === activeId);
+                if (tab) void close(tab);
+              }}
+            />
+          )}
       </div>
     </div>
   );

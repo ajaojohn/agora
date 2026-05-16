@@ -136,9 +136,9 @@ app.on("before-quit", async (event) => {
     // because disposeAll's SIGKILL timeout could push us past whatever
     // grace window the OS allows for app exit.
     if (ws) {
-      await ws.flush().catch((err) =>
-        console.error("[main] workspace flush failed:", err),
-      );
+      await ws
+        .flush()
+        .catch((err) => console.error("[main] workspace flush failed:", err));
     }
     vm?.destroyAll();
     await sm?.disposeAll();

@@ -6,12 +6,7 @@
 // store, so even a malformed payload from a compromised renderer can't
 // poison the on-disk file beyond a debounce window.
 import { ipcMain } from "electron";
-import {
-  IPC,
-  TabSchema,
-  type Tab,
-  type Workspace,
-} from "@shared/ipc";
+import { IPC, TabSchema, type Tab, type Workspace } from "@shared/ipc";
 import { z } from "zod";
 import type { WorkspaceStore } from "../workspaceStore";
 
