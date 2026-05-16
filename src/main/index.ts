@@ -79,7 +79,7 @@ async function bootstrap(): Promise<void> {
       userDataDir: codeServerUserDataDir,
       port,
     });
-    viewManager = new ViewManager();
+    viewManager = new ViewManager(() => mainWindow);
 
     console.log(`[main] code-server resolved at ${codeServerPath}`);
     console.log(`[main] starting shared code-server on port ${port}...`);

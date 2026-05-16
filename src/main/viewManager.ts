@@ -14,7 +14,7 @@
 // reach our window.api or any Node primitive. The M2 attention extension
 // will talk to main via a separate localhost WebSocket, not the preload bridge.
 import { shell, WebContentsView, type BrowserWindow } from "electron";
-import type { ViewBounds } from "@shared/ipc";
+import { IPC, type ViewBounds } from "@shared/ipc";
 import { waitForPort } from "./tcpReady";
 
 interface ViewRecord {
@@ -38,6 +38,8 @@ export class ViewManager {
   // Currently-shown sessionId, or null if no view is foregrounded. Used by
   // setActive to know what to hide before showing the next.
   private activeSessionId: string | null = null;
+
+  constructor(private readonly getMainWindow: () => BrowserWindow | null) {}
 
   // High-level "switch the foregrounded view". Hides current active (keeps
   // its webContents alive), then either shows an already-attached view or
@@ -158,6 +160,25 @@ export class ViewManager {
     view.webContents.setWindowOpenHandler(({ url: targetUrl }) => {
       void shell.openExternal(targetUrl);
       return { action: "deny" };
+    });
+
+    // Chromium swallows Cmd+Shift+N before menu.ts's accelerator sees it
+    // when a view is focused. KEEP IN SYNC with menu.ts.
+    // TODO: when a second shortcut lands, replace this hardcoded match
+    // with a generic dispatcher that walks Menu.getApplicationMenu() and
+    // routes any accelerator match to the corresponding item's click.
+    view.webContents.on("before-input-event", (event, input) => {
+      if (input.type !== "keyDown") return;
+      if (
+        input.meta &&
+        input.shift &&
+        !input.control &&
+        !input.alt &&
+        input.code === "KeyN"
+      ) {
+        event.preventDefault();
+        this.getMainWindow()?.webContents.send(IPC.menuNewWorkspace);
+      }
     });
 
     this.views.set(sessionId, { view, parent: null });
