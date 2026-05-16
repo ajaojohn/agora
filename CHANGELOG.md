@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/ajaojohn/agora/compare/v0.1.2...v0.1.3) (2026-05-16)
+
+
+### Bug Fixes
+
+* have release-please cut drafts so dmg upload type matches ([#14](https://github.com/ajaojohn/agora/issues/14)) ([c096aaf](https://github.com/ajaojohn/agora/commit/c096aaf3841928c1a2ea199167bc2adbdee26e67))
+
 ## [0.1.2](https://github.com/ajaojohn/agora/compare/v0.1.1...v0.1.2) (2026-05-16)
 
 
