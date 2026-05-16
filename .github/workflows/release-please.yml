@@ -3,6 +3,9 @@ name: release-please
 on:
   push:
     branches: [main]
+  # Allow firing the build job manually against current main (e.g. to
+  # backfill a dmg for a release that shipped without one).
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,9 +14,31 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: rp
+        # Skip on manual dispatch -- we only want the build job to run.
+        if: github.event_name != 'workflow_dispatch'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  build-mac:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Build + publish dmg
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:mac -- --universal --publish always
