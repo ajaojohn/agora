@@ -75,9 +75,9 @@ export function TabBar({
               }}
             >
               <span className="tab-label">{basename(tab.cwd)}</span>
-              {state && typeof state === "object" && state.kind === "loading" && (
-                <span className="tab-spinner" />
-              )}
+              {state &&
+                typeof state === "object" &&
+                state.kind === "loading" && <span className="tab-spinner" />}
               {state && typeof state === "object" && state.kind === "error" && (
                 <span className="tab-error-dot" aria-label="error" />
               )}
@@ -115,10 +115,7 @@ export function TabBar({
 // / error) into the className the stylesheet keys off. `tab-active`
 // composes with the state class -- e.g. an error tab that's also active
 // is `tab tab-error tab-active`, gets the accent left border + the red dot.
-function tabClassName(
-  state: TabState | undefined,
-  isActive: boolean,
-): string {
+function tabClassName(state: TabState | undefined, isActive: boolean): string {
   const parts = ["tab"];
   if (state === "unspawned" || state === undefined) parts.push("tab-unspawned");
   else if (typeof state === "object") {
@@ -129,4 +126,3 @@ function tabClassName(
   if (isActive) parts.push("tab-active");
   return parts.join(" ");
 }
-

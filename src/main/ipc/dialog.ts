@@ -13,7 +13,9 @@ export function registerDialogIpc(): void {
   ipcMain.handle(
     IPC.dialogPickFolder,
     async (): Promise<PickFolderResponse> => {
-      const opts: Electron.OpenDialogOptions = { properties: ["openDirectory"] };
+      const opts: Electron.OpenDialogOptions = {
+        properties: ["openDirectory"],
+      };
       const parent = BrowserWindow.getFocusedWindow();
       const result = parent
         ? await dialog.showOpenDialog(parent, opts)

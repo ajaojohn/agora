@@ -1,44 +1,28 @@
 # Agora
 
-macOS multi-tab IDE host for running CLI coding agents in parallel across many projects.
+macOS Electron app — multiple VS Code workspaces in one window with quick tab switching.
 
 <p align="center">
   <img width="1724" height="980" alt="agora readme gif" src="https://github.com/user-attachments/assets/9f033273-637a-46dd-9326-8904d6b61287" />
 </p>
 
-> ⚠️ Early development. M1 (multi-tab daily-driver) in progress on `m1-terminal-skeleton`. Not yet packaged for install.
+> ⚠️ Pre-1.0. Active development; breaking changes possible. Agora ships the IDE host today — agent-aware features (per-tab attention indicators, cross-tab notifications, dock badges, prewarm pool) are on the roadmap and not yet built. See [Releases](../../releases) for what has shipped.
 
 ## What it is
 
-Agora is a single Electron window with N tabs. Each tab embeds a full VS Code instance (via [code-server](https://github.com/coder/code-server)) bound to its own working directory. You open the integrated terminal in any tab and run a CLI coding agent — Claude Code, Codex, Aider, whatever — and it runs there isolated from the other tabs.
+A tabbed wrapper around N VS Code instances. Each tab runs a full [code-server](https://github.com/coder/code-server) bound to a folder. Click a tab → that workspace foregrounds. State persists across quit: editor buffers, terminal scrollback, any process running in a tab's integrated terminal, source-control panel, tab list.
 
-Switching tabs swaps which workspace is foregrounded. Each tab keeps its agent running, its editor state, its terminal scrollback, its source-control panel. Tab list survives quit and restart.
+That's the whole app today. No agent integration, no cross-tab coordination, no per-tab indicators — just a window manager for parallel VS Code workspaces.
 
 ## Why
 
-If you run AI coding agents across many repos, you currently juggle:
-
-- A terminal multiplexer per agent
-- N separate VS Code or Cursor windows scattered across the desktop, one per repo, for diff review and editing
-
-Agora collapses both into one window. Each tab is `(cwd + agent + IDE)`. Project switching becomes a tab click instead of a Cmd-Tab dance through scattered windows. Claude Code's IDE features (graphical diff, @ mentions, auto-accept) fire natively because each tab really is VS Code.
-
-## Status
-
-| Milestone | Status | What ships |
-|---|---|---|
-| M1 — multi-tab daily-driver | In progress | Tab bar, per-tab code-server, persistent workspace, lazy spawn |
-| M2 — attention detection | Planned | `agora-helper` extension, per-tab indicators, macOS notifications, dock badge |
-| M3 — polish | Planned | Settings UI, tab reorder/rename, prewarm pool |
-| M4 — packaging | Planned | Signed/notarized dmg, auto-update |
-
-See [`.plan/roadmap.md`](.plan/roadmap.md) for the full roadmap and [`.plan/vision.md`](.plan/vision.md) for the product thesis.
+If you work across many repos with AI coding agents, you currently juggle N separate VS Code or Cursor windows scattered across the desktop plus a terminal multiplexer for the agents themselves. Agora collapses that into one window: each tab is its own real VS Code, and whatever you run in its integrated terminal (agent, dev server, REPL) stays isolated. Because each tab really is VS Code, any IDE features the agent itself ships (graphical diff, @ mentions, auto-accept) fire when it runs in the terminal — Agora doesn't add or proxy them.
 
 ## Requirements
 
 - macOS (v1 is Mac-only — Linux/Windows deferred)
 - `code-server` on `PATH`: `brew install code-server`
-- A CLI coding agent of your choice (e.g. `claude`, `codex`) installed inside any tab's VS Code
+- A CLI coding agent of your choice installed inside any tab's VS Code
 
 ## Run from source
 
@@ -55,17 +39,17 @@ npm run dev
 npm run build:mac
 ```
 
-Output lands in `release/`. Note: M4 (signing + notarization + auto-update) not done yet — local builds run unsigned.
+Output lands in `release/`. Builds are ad-hoc signed — Gatekeeper will warn on first open; right-click → Open to bypass. CI also builds and publishes a universal dmg on every release; grab it from the [Releases](../../releases) page. Proper signing + notarization + auto-update pending Apple Developer ID enrollment.
 
 ## Architecture
 
 Three TypeScript projects in one repo:
 
-- **Main** — owns code-server child processes, port allocation, `workspace.json` persistence, view lifecycle
+- **Main** — owns code-server child processes, port allocation, view lifecycle, persistence
 - **Preload** — typed `contextBridge` exposing `window.api`
-- **Renderer** — React + tab bar + content area; hosts `WebContentsView` per tab
+- **Renderer** — React tab bar + content area; each tab hosts a `WebContentsView` painted over the content div
 
-IPC channel contract lives in `src/shared/ipc.ts`. Architecture decision rationale in [`.plan/decisions.md`](.plan/decisions.md).
+IPC channel contract lives in `src/shared/ipc.ts`.
 
 ## License
 

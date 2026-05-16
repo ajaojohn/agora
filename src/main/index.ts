@@ -13,12 +13,16 @@ import { SessionManager, pickStablePort } from "./sessionManager";
 import { ViewManager } from "./viewManager";
 import { WorkspaceStore } from "./workspaceStore";
 import { seedUserDataDir } from "./userDataSeeder";
+import { installApplicationMenu } from "./menu";
 
 // Module-scope so before-quit can dispose them. Null until app.whenReady
 // resolves the locator and constructs the managers.
 let sessionManager: SessionManager | null = null;
 let viewManager: ViewManager | null = null;
 let workspaceStore: WorkspaceStore | null = null;
+// App shell window. Menu callbacks target its renderer (the only one
+// with the preload bridge).
+let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -30,6 +34,10 @@ function createWindow(): void {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+  mainWindow = win;
+  win.on("closed", () => {
+    if (mainWindow === win) mainWindow = null;
   });
 
   // electron-vite sets ELECTRON_RENDERER_URL in dev so HMR works against the Vite dev server.
@@ -71,7 +79,7 @@ async function bootstrap(): Promise<void> {
       userDataDir: codeServerUserDataDir,
       port,
     });
-    viewManager = new ViewManager();
+    viewManager = new ViewManager(() => mainWindow);
 
     console.log(`[main] code-server resolved at ${codeServerPath}`);
     console.log(`[main] starting shared code-server on port ${port}...`);
@@ -85,6 +93,7 @@ async function bootstrap(): Promise<void> {
     registerSessionIpc(sessionManager);
     registerViewIpc(viewManager, sessionManager);
     registerWorkspaceIpc(workspaceStore);
+    installApplicationMenu(() => mainWindow);
   } catch (err) {
     if (err instanceof CodeServerNotFoundError) {
       dialog.showErrorBox("code-server not found", err.message);
@@ -136,9 +145,9 @@ app.on("before-quit", async (event) => {
     // because disposeAll's SIGKILL timeout could push us past whatever
     // grace window the OS allows for app exit.
     if (ws) {
-      await ws.flush().catch((err) =>
-        console.error("[main] workspace flush failed:", err),
-      );
+      await ws
+        .flush()
+        .catch((err) => console.error("[main] workspace flush failed:", err));
     }
     vm?.destroyAll();
     await sm?.disposeAll();
