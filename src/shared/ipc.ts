@@ -23,6 +23,8 @@ export const IPC = {
   workspaceSetTabs: "workspace:setTabs",
   workspaceSetActive: "workspace:setActive",
   cwdExists: "cwd:exists",
+  // One-way main -> renderer event (uses send/on, not invoke/handle).
+  menuNewWorkspace: "menu:newWorkspace",
 } as const;
 
 export type PickFolderResponse = { path: string } | null;
@@ -97,4 +99,5 @@ export interface RendererApi {
   // a clearer "Folder no longer exists" error before attempting a code-
   // server spawn that would fail anyway.
   cwdExists(cwd: string): Promise<boolean>;
+  onMenuNewWorkspace(cb: () => void): () => void;
 }

@@ -173,6 +173,15 @@ export function App() {
     }
   }
 
+  // Ref indirection: open() closes over tabs[], subscribing once would
+  // freeze the initial empty list and race new tabs against stale state.
+  const openRef = useRef(open);
+  openRef.current = open;
+  useEffect(
+    () => window.api.onMenuNewWorkspace(() => void openRef.current()),
+    [],
+  );
+
   // Window title: Mac convention is "<app> — <doc>". Empty when no active.
   useEffect(() => {
     if (activeId !== null) {

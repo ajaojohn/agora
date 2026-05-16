@@ -17,6 +17,10 @@ const api: RendererApi = {
   setWorkspaceActive: (activeId) =>
     ipcRenderer.invoke(IPC.workspaceSetActive, activeId),
   cwdExists: (cwd) => ipcRenderer.invoke(IPC.cwdExists, cwd),
+  onMenuNewWorkspace: (cb) => {
+    ipcRenderer.on(IPC.menuNewWorkspace, cb);
+    return () => ipcRenderer.removeListener(IPC.menuNewWorkspace, cb);
+  },
 };
 
 // Puts `api` on the renderer's `window` as `window.api`.
