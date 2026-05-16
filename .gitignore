@@ -9,3 +9,8 @@ release
 # Plans live in a separate private repo (github.com/ajaojohn/agora-plan)
 # mounted at .plan/ locally. Do not commit them to the public repo.
 .plan/
+
+# Personal Claude Code state (per-user permissions, worktrees). Shared
+# settings live in .claude/settings.json which IS tracked.
+.claude/settings.local.json
+.claude/worktrees/
