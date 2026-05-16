@@ -1,9 +1,7 @@
-// Electron-vite build config. Defines the main and renderer targets.
-// Preload target is added in commit 4 when the IPC bridge lands.
-//
-// Note: dependency externalization for main is on by default in electron-vite 5
-// (`build.externalizeDeps: true`). When node-pty arrives in commit 7, that
-// default will keep its native binary out of the bundle automatically.
+// Electron-vite build config for main, preload, and renderer targets. Each
+// resolves the `@shared/*` alias to `src/shared/` so the cross-process type
+// contract is the single source of truth. Main uses electron-vite 5's default
+// `build.externalizeDeps: true` to keep node deps out of the bundle.
 import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import { resolve } from "path";

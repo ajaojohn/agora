@@ -11,8 +11,9 @@
 // Security: views load arbitrary HTTP origins (code-server is local but the
 // page it serves is a full HTML5 environment running extensions). Views run
 // with sandbox: true, contextIsolation: true, no preload -- they cannot
-// reach our window.api or any Node primitive. The M2 attention extension
-// will talk to main via a separate localhost WebSocket, not the preload bridge.
+// reach our window.api or any Node primitive. Any future attention or
+// telemetry extension will talk to main via a separate localhost WebSocket,
+// not the preload bridge.
 import { shell, WebContentsView, type BrowserWindow } from "electron";
 import { IPC, type ViewBounds } from "@shared/ipc";
 import { waitForPort } from "./tcpReady";

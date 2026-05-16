@@ -1,5 +1,5 @@
-// Top-level component. Multi-tab state shape, single-pane UI for now --
-// tab bar component lands in commit 15.
+// Top-level component. Owns the multi-tab state shape and routes the
+// active tab's WebContentsView placement to main via the view IPC.
 //
 // Two ID concepts deliberately kept separate:
 //   tab.id        -- persisted UUID, stable across app launches, lives in

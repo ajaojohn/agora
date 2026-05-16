@@ -1,82 +1,48 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for coding agents working with this repository.
 
 ## What this is
 
-A macOS Electron desktop app. Each tab embeds a full VS Code instance via [code-server](https://github.com/coder/code-server) hosted in an Electron `<webview>`, bound to its own cwd. Claude Code in code-server's integrated terminal detects real VS Code → IDE-integrated mode fires natively (graphical diff, @ mentions, auto-accept).
+A macOS Electron desktop app. Each tab embeds a full VS Code instance via [code-server](https://github.com/coder/code-server) hosted in an Electron `WebContentsView`, bound to its own cwd. VS Code-aware coding agents running inside code-server's integrated terminal detect real VS Code → IDE-integrated features fire natively (graphical diff, @ mentions, auto-accept where supported).
 
-**Why this exists vs cmux**: cmux solves parallel agent terminals; Agora extends to integrated full-IDE per tab. Each tab is `(cwd + code-server VS Code + Claude Code IDE features)`. cmux + N IDEs becomes Agora's N tabs. See `.plan/vision.md` for the thesis and `.plan/decisions.md` for why this design (Path D) was chosen over forking VS Code or building from scratch.
+**Shape**: each tab is `(cwd + code-server VS Code + agent IDE features)`. Tabs are independent — separate cwd, separate workspace state, separate agent sessions in the integrated terminal — but share a single code-server process under the hood for resource efficiency.
 
-**Status (2026-04-28)**: M1 (single-session: folder picker → embedded code-server in webview) being rebuilt on the `m1-terminal-skeleton` branch with current toolchain (Electron 41, TS 6, electron-vite 5). Commits 1-5 done (tooling, main, React, preload, IPC contract); commits 6-10 reshape around code-server lifecycle instead of node-pty. M2 adds multi-tab + persistence + attention detection (via auto-installed `agora-helper` VS Code extension). M3 polish. M4 Mac packaging. **Mac-only for v1**; Linux/Windows deferred. See `.plan/roadmap.md`.
+**Mac-only for v1**; Linux/Windows deferred.
 
 ## Working style
 
-Surface the technical details and tradeoffs behind non-trivial choices — don't just state the outcome. When picking a library, shaping an IPC channel, or making a lifecycle / security / performance tradeoff, explain the reasoning and the cost so the user understands the decision, not just the result. Flag considerations they may not see (e.g. "this means PTY bytes bypass React state", "this ships separate arm64/x64 dmgs instead of a universal").
+Surface the technical details and tradeoffs behind non-trivial choices — don't just state the outcome. When picking a library, shaping an IPC channel, or making a lifecycle / security / performance tradeoff, explain the reasoning and the cost so the user understands the decision, not just the result.
 
-**Be willing to be adversarial.** If the user proposes something you think is wrong, weakly reasoned, or storing up problems, say so plainly and argue the case before you implement. Push back on premises, flag risks, and offer the counter-view — agreeing reflexively is a failure mode, not politeness. The user wants a collaborator who'll challenge bad ideas early, not one who executes smoothly and leaves them to discover the cost later. Default to teaching _and_ disagreeing alongside executing.
+**Be willing to be adversarial.** If the user proposes something you think is wrong, weakly reasoned, or storing up problems, say so plainly and argue the case before you implement. Push back on premises, flag risks, and offer the counter-view — agreeing reflexively is a failure mode. Default to teaching _and_ disagreeing alongside executing.
 
-## Commands
+## Where things live
 
-```
-npm run dev          # electron-vite dev: builds main/preload, starts renderer HMR, launches Electron
-npm run build        # production bundle to out/{main,preload,renderer}
-npm run start        # preview a production build
-npm run typecheck    # tsc --noEmit for both node (main/preload) and web (renderer) projects
-```
+- **`package.json` scripts** — `dev`, `build`, `start`, `typecheck`, `format`, `format:check`, `build:mac`. Run from there; don't memorize.
+- **`src/shared/`** — single source of truth for cross-process types. `@shared/*` alias resolves in main, preload, and renderer via two tsconfigs (`tsconfig.node.json` for main/preload, `tsconfig.web.json` for renderer) and `electron.vite.config.ts`.
 
-No test runner is wired yet; when adding one, use Vitest for unit (mock `node-pty`) and Playwright's `_electron.launch` for e2e.
+## Architecture invariants
 
-## Architecture
+- **Renderer is React only** — no terminal emulator, no native modules. code-server's own editor/terminal lives inside its WebContentsView; the React shell only hosts tabs, dialogs, and overlay UI.
+- **IPC contract** — every channel lives in `src/shared/ipc.ts`. Adding one is a 5-step change in this order: (1) `IPC` constants, (2) request/response types, (3) `RendererApi` method, (4) preload bridge method, (5) main handler. Missing any step produces compile errors on both sides thanks to the shared types.
+- **No high-frequency data through IPC** — terminal output, file watch streams, etc. already stay inside code-server's own WebSocket inside its WebContentsView. The Electron IPC layer is for control plane only (open folder, create session, set view bounds, menu events).
+- **code-server is a third-party origin** — its WebContentsView has no preload bridge and cannot reach `window.api`. Treat the page as untrusted; route any cross-process needs through dedicated main-side IPC, never by exposing more surface to the view.
+- **Security boundary for future fs handlers** — when any IPC handler accepts a path from the renderer, validate it against the session's cwd using `path.resolve` + `startsWith` in main. Files outside the session cwd must not be readable or writable. Currently no such handler exists; rule applies whenever one is added.
 
-Three TypeScript projects behind one repo, enforced by two tsconfigs:
+## Comment convention
 
-- **`tsconfig.node.json`** — compiles `src/main/**`, `src/preload/**`, `src/shared/**`, `electron.vite.config.ts`. Node + Electron types.
-- **`tsconfig.web.json`** — compiles `src/renderer/**`, `src/shared/**`, `src/preload/index.d.ts`. DOM + React types.
-- Both projects use the `@shared/*` path alias so `src/shared/` is the single source of truth for cross-process types. The same alias is registered in `electron.vite.config.ts` for bundling.
+Every source file has a **light header comment** (1–3 lines) explaining its purpose. Non-obvious exports get a one-line comment; obvious ones (where the name + TypeScript signature already tell the story) get nothing. **Never** multi-paragraph docstrings, line-by-line narration, or `@param` blocks. Don't strip these back out — they're the project's onboarding surface.
 
-### Process roles
+## Docs hygiene
 
-- **Main (`src/main/`)** — owns node-pty PTYs via `SessionManager`, exposes IPC, opens folder dialogs, will own filesystem I/O and `workspace.json` persistence in M2/M3.
-- **Preload (`src/preload/index.ts`)** — `contextBridge.exposeInMainWorld('api', ...)` exposes a typed `RendererApi` to the renderer. `src/preload/index.d.ts` augments `Window` so renderer code can call `window.api.*` with full types. `contextIsolation: true`, `sandbox: false`.
-- **Renderer (`src/renderer/`)** — React + xterm.js. The `Terminal` component owns an `Xterm` instance per `sessionId` and wires it to `window.api.ptyWrite/ptyResize/onPtyData/onPtyExit`.
+Treat `CLAUDE.md` and `README.md` as part of the change surface. If a code or process change contradicts any claim in either file — architecture invariants, dependency list, release workflow, status statements — update or remove the affected prose in the same change. The same rule applies to source-file headers and config comments: when their stated rationale no longer matches the file's actual role, fix the comment, don't leave the drift behind.
 
-### IPC contract
+## Release workflow
 
-All channel names and payload types live in `src/shared/ipc.ts`. `RendererApi` is the interface the preload implements and that `window.api` conforms to in the renderer. When adding a channel, update (1) the `IPC` constants, (2) the request/response types, (3) `RendererApi`, (4) the preload bridge method, and (5) the main-process handler — in that order. Missing any of these produces compile errors on both sides thanks to the shared types.
+Releases are fully automated via `release-please` + electron-builder. Do not bump `package.json` version manually, do not create `vX.Y.Z` tags, do not push directly to `main`.
 
-### PTY data path (important)
-
-PTY output does **not** flow through React state / Zustand. The Terminal component subscribes to `window.api.onPtyData` and writes bytes directly into xterm's buffer. xterm owns the scrollback. This matters because PTY streams hit 60fps+ during compile output; routing it through state would cause full-tree re-renders. When adding M2 multi-session state, keep PTY bytes out of the store and use a `Map<sessionId, Terminal>` ref registry in the renderer to route `onPtyData` events.
-
-### Shell spawn behavior
-
-`SessionManager.create(cwd)` spawns `$SHELL -l` (or `/bin/zsh -l`) in the chosen cwd with `TERM=xterm-256color`. The **login shell is intentional** — on macOS, apps launched from Finder have a minimal `process.env.PATH` that won't include `~/.local/bin` or `/opt/homebrew/bin`, and a login shell inherits the user's full PATH via `.zprofile` / `.zshrc`. Don't change to a non-login shell without a PATH-fallback strategy.
-
-`close()` sends SIGHUP (not SIGKILL) so the shell can clean up. `app.before-quit` and `window-all-closed` both call `manager.disposeAll()`.
-
-### Security boundary (for M3 work)
-
-When fs IPC handlers are added, all `relPath` inputs must be validated against the session's cwd using `path.resolve` + `startsWith` in the main process. Never trust paths from the renderer. Files outside the session cwd must not be readable or writable.
-
-### Docs convention
-
-Planning and codebase documentation live in `.plan/`, which is a **separate private repo** (github.com/ajaojohn/agora-plan) mounted at `.plan/` locally and gitignored in this repo. If you're cloning Agora from GitHub you won't see those files — request access to the plan repo if you need them.
-
-Inside `.plan/`:
-
-- **`vision.md`** — product thesis (what + why). Read first.
-- **`roadmap.md`** — milestone plan (M1–M4), IPC contract, architecture, risks.
-- **`decisions.md`** — architecture decision rationale (why Path D, what was rejected).
-- **`history.md`** — past-milestone ship records and rebuild-status notes. Append M2/M3 sections as they ship.
-- **`code-map.md`** — per-file living reference. **Update it in the same commit as any non-trivial change under `src/`.** Missing entries are treated as broken builds. Since it lives in a separate repo, that's a separate `cd .plan && git commit` — the parent repo won't track the change.
-
-Start there before diving into code.
-
-### Comment convention
-
-Every source file has a **light header comment** (1–3 lines) explaining its purpose and who uses it. Non-obvious exports get a one-line comment; obvious ones (where the name and signature already tell the story) get nothing. **Never** multi-paragraph docstrings, line-by-line narration, or `@param` blocks where TypeScript types already speak. Don't strip these back out — they're the project's onboarding surface alongside `.plan/code-map.md`.
-
-## Native modules
-
-`node-pty` is a native module. The `postinstall` hook runs `electron-rebuild -f -w node-pty` to rebuild against Electron's Node ABI. If you bump the `electron` version or switch architectures, run `npm rebuild` or reinstall to re-trigger.
+- **PR titles must use Conventional Commits** (`feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `chore:`, `style:`, `test:`, `ci:`, `build:`). Enforced by `.github/workflows/pr-title.yml`. The PR title becomes the squash subject on merge, and that subject is what release-please scans to decide the bump (`feat:` → minor, `fix:` → patch, `feat!:` or `BREAKING CHANGE:` → major).
+- **CI (`ci.yml`)** runs `npm run typecheck` on every PR and main push.
+- **Cutting a release**: merge feature PRs to `main` normally. `release-please.yml` runs on each main push, scans commits since the last release, and opens (or updates) a single **Release PR** that bumps `package.json` + `.release-please-manifest.json` and rewrites `CHANGELOG.md`. Review and merge that Release PR → release-please creates the `vX.Y.Z` git tag + GitHub release with the CHANGELOG as release notes.
+- **dmg build (`release-build.yml`)** fires on `release: published`. macOS runner runs `npm run build:mac -- --universal --publish always` and uploads the universal dmg as a release asset. Currently ad-hoc signed (`identity: "-"` in `package.json`); proper signing + notarization needs Apple Developer ID secrets — defer until enrolled.
+- `.release-please-manifest.json` is the source of truth for "what version is currently released". Always edited by release-please's own PRs.
