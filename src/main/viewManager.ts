@@ -90,6 +90,8 @@ export class ViewManager {
     parent.contentView.addChildView(record.view);
     record.parent = parent;
     this.activeSessionId = sessionId;
+
+    record.view.webContents.focus();
   }
 
   setBounds(sessionId: string, bounds: ViewBounds): void {
