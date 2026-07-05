@@ -82,6 +82,18 @@ export function TabBar({
               {state && typeof state === "object" && state.kind === "error" && (
                 <span className="tab-error-dot" aria-label="error" />
               )}
+              <button
+                className="tab-close"
+                title="Close"
+                onClick={(e) => {
+                  // Row onClick would otherwise activate (and maybe spawn)
+                  // the tab being closed.
+                  e.stopPropagation();
+                  onClose(tab);
+                }}
+              >
+                ×
+              </button>
             </div>
           );
         })}
