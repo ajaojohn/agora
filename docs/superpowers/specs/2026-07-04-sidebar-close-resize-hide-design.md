@@ -16,15 +16,25 @@ including full hide.
 
 ### Confirm rule
 
+- What close actually does (corrected after reading `sessionManager.ts` /
+  `viewManager.ts`): all tabs share ONE code-server process; close destroys
+  the tab's WebContentsView and forgets the logical session, the server
+  survives. Integrated-terminal processes live server-side and VS Code's
+  persistent-terminal default keeps them running after the client
+  disconnects — reopening the same folder reattaches them. The risk close
+  guards against is losing _sight_ of a live agent (it keeps running
+  invisibly until app quit), not killing it. The stale `TabBar.tsx` /
+  `App.tsx` comments claiming close "kills a code-server" get fixed in the
+  same change.
 - Tab state `loading` or `loaded` → native confirm sheet before closing.
-  Killing the session kills the code-server child, its integrated terminals,
-  and any agent process running in them; VS Code per-workspace UI state
-  survives on disk, killed processes do not.
-- Tab state `unspawned` or `error` → close immediately, no dialog (no live
-  process to lose).
-- Dialog copy: title "Close project?", message names the folder basename and
-  states that running terminals and agents will be killed. Buttons:
-  "Close Project" (destructive default) / "Cancel".
+- Tab state `unspawned` or `error` → close immediately, no dialog (nothing
+  live behind the tab).
+- Dialog copy: message `Close “<basename>”?`, detail "Anything running in
+  its terminals keeps running in the background until Agora quits." Buttons:
+  "Close Project" (default) / "Cancel". An empirical check during
+  implementation verifies terminal-process survival; if processes in fact
+  die on view close, the detail line changes to "Running terminals and
+  agents will be killed."
 
 ### Mechanism
 
@@ -39,9 +49,10 @@ including full hide.
 
 Today `close()` tears down only `loaded` tabs. Closing a tab whose spawn is
 in flight removes the tab but lets `spawn()` finish, re-inserting state for a
-deleted tab id and leaking an orphan code-server child. Fix: when `spawn()`
-resolves, check the tab still exists in current tab state; if not, close the
-just-created session and discard the state update.
+deleted tab id and leaking a hidden live WebContentsView plus a stale session
+record (not a process — the server is shared). Fix: when `spawn()` resolves,
+check the tab still exists in current tab state; if not, close the
+just-created view + session and discard the state update.
 
 ## B. Sidebar resize + hide
 
@@ -52,11 +63,14 @@ just-created session and discard the state update.
 - Width clamped to **120–400px**.
 - Dragging below ~80px snaps the sidebar to hidden (VS Code idiom).
 - Double-click on the handle toggles hidden.
-- **Drag shield**: while a drag is active, a transparent full-content overlay
-  div captures pointer events. Required because the code-server
-  WebContentsView is a separate compositor layer with its own web contents —
-  it swallows mousemove the moment the cursor crosses in, killing the drag
-  mid-gesture.
+- **View hidden during drag**: on drag start the renderer calls
+  `setActiveView(null)` (webContents stays alive), on pointer-up it restores
+  the active session's view — instant, no reload. Required because the
+  WebContentsView is a native child view composited above the entire
+  renderer page: no DOM overlay can cover it, and pointermove stops reaching
+  the shell the moment the cursor crosses into it. Content area shows plain
+  background during the gesture; a DOM shield div still overlays the (now
+  view-free) page to keep the `col-resize` cursor and block text selection.
 
 ### Hide / show
 
@@ -67,6 +81,15 @@ just-created session and discard the state update.
   app-menu accelerator would steal them from the editor).
 - Menu fires a one-way main → renderer event mirroring the existing
   `menu:newWorkspace` pattern (`onMenuToggleSidebar` in `RendererApi`).
+- **Accelerator dispatcher**: a focused code-server view swallows keystrokes
+  before menu accelerators run (`viewManager.ts` documents this and
+  hardcodes a Cmd+Shift+N match with a TODO to generalize once a second
+  shortcut lands). This work implements that TODO: a small
+  `menuAccelerators.ts` walks `Menu.getApplicationMenu()` for items whose
+  `id` starts with `agora:` (role items like Copy must keep Chromium's
+  native handling), parses their modifier+letter accelerators, and routes
+  matching `before-input-event` keystrokes to `item.click()`. The hardcoded
+  Cmd+Shift+N block is replaced by the dispatcher.
 - The editor view follows automatically: `Active`'s ResizeObserver on
   `.view-host` already reports bounds to main on any layout change. No new
   bounds plumbing.
@@ -118,8 +141,13 @@ just-created session and discard the state update.
 
 - `npm run typecheck` clean.
 - Manual run: close unspawned tab (instant), close loaded tab (sheet →
-  confirm kills, cancel keeps), close while loading (no orphan child —
-  verify via `pgrep -f code-server` count), drag resize + clamp, drag-past-min
+  confirm closes, cancel keeps), close while loading (no leaked hidden view —
+  session list empty after close), drag resize + clamp, drag-past-min
   snap-hide, double-click hide, edge-strip reveal, Cmd+Ctrl+B toggle with
-  editor focused (VS Code Cmd+B still works inside the editor), relaunch
-  restores width/hidden.
+  editor focused (VS Code Cmd+B still works inside the editor), Cmd+Shift+N
+  still opens the folder picker with editor focused (dispatcher regression),
+  relaunch restores width/hidden.
+- Empirical close-semantics check: start `sleep 600` in a tab's integrated
+  terminal, close the tab, `pgrep -f "sleep 600"` — expect survival; reopen
+  the folder and expect the terminal to reattach. If it dies instead, change
+  the dialog detail line per the Confirm rule section.
