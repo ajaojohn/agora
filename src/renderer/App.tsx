@@ -146,18 +146,16 @@ export function App() {
   }
 
   // Sidebar drag: window-level listeners so the gesture survives the cursor
-  // leaving the 5px handle. Persist once on pointer-up.
+  // leaving the 5px handle. Termination is defensive: pointerup is the
+  // normal path, but pointercancel, window blur (Cmd+Tab mid-drag), and a
+  // buttons-free move also end it -- a stuck drag would leave the
+  // full-screen shield blocking all mouse input.
   useEffect(() => {
     if (!sidebarDragging) return;
-    function onMove(e: PointerEvent): void {
-      if (e.clientX < SIDEBAR_SNAP_HIDE_PX) {
-        setSidebarHidden(true);
-        return;
-      }
-      setSidebarHidden(false);
-      setSidebarWidth(clampSidebarWidth(e.clientX));
-    }
-    function onUp(): void {
+    let ended = false;
+    function endDrag(): void {
+      if (ended) return;
+      ended = true;
       setSidebarDragging(false);
       const { width, hidden } = sidebarRef.current;
       void window.api.setWorkspaceSidebar({ width, hidden });
@@ -165,11 +163,27 @@ export function App() {
         void window.api.setActiveView(activeSessionRef.current);
       }
     }
+    function onMove(e: PointerEvent): void {
+      if (e.buttons === 0) {
+        endDrag();
+        return;
+      }
+      if (e.clientX < SIDEBAR_SNAP_HIDE_PX) {
+        setSidebarHidden(true);
+        return;
+      }
+      setSidebarHidden(false);
+      setSidebarWidth(clampSidebarWidth(e.clientX));
+    }
     window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+    window.addEventListener("blur", endDrag);
     return () => {
       window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointerup", endDrag);
+      window.removeEventListener("pointercancel", endDrag);
+      window.removeEventListener("blur", endDrag);
     };
   }, [sidebarDragging]);
 
