@@ -15,6 +15,7 @@ interface Props {
   tabs: Tab[];
   activeId: string | null;
   perTabState: Map<string, TabState>;
+  width: number;
   onActivate: (tab: Tab) => void;
   onClose: (tab: Tab) => void;
   onAdd: () => void;
@@ -30,6 +31,7 @@ export function TabBar({
   tabs,
   activeId,
   perTabState,
+  width,
   onActivate,
   onClose,
   onAdd,
@@ -55,7 +57,7 @@ export function TabBar({
   }, [menu]);
 
   return (
-    <div className="tab-bar">
+    <div className="tab-bar" style={{ width }}>
       <div className="tab-list">
         {tabs.map((tab) => {
           const state = perTabState.get(tab.id);

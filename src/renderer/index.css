@@ -113,6 +113,27 @@ button:hover {
   position: relative;
 }
 
+/* Resize handle: 5px strip overlapping the sidebar's right edge so it adds
+   no layout width. */
+.sidebar-handle {
+  flex: 0 0 5px;
+  margin-left: -5px;
+  cursor: col-resize;
+  z-index: 10;
+}
+.sidebar-handle:hover {
+  background: rgba(74, 158, 255, 0.4);
+}
+
+/* Covers the page during a sidebar drag (the editor view is hidden for the
+   gesture) -- keeps the col-resize cursor and blocks stray selection. */
+.drag-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  cursor: col-resize;
+}
+
 .tab-list {
   flex: 1;
   overflow-y: auto;
