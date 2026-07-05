@@ -17,6 +17,8 @@ const api: RendererApi = {
   setWorkspaceTabs: (tabs) => ipcRenderer.invoke(IPC.workspaceSetTabs, tabs),
   setWorkspaceActive: (activeId) =>
     ipcRenderer.invoke(IPC.workspaceSetActive, activeId),
+  setWorkspaceSidebar: (state) =>
+    ipcRenderer.invoke(IPC.workspaceSetSidebar, state),
   cwdExists: (cwd) => ipcRenderer.invoke(IPC.cwdExists, cwd),
   onMenuNewWorkspace: (cb) => {
     ipcRenderer.on(IPC.menuNewWorkspace, cb);

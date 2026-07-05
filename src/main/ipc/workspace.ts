@@ -15,6 +15,10 @@ import type { WorkspaceStore } from "../workspaceStore";
 // never holds invalid data.
 const TabsPayload = z.array(TabSchema);
 const ActivePayload = z.string().nullable();
+const SidebarPayload = z.object({
+  width: z.number().int().min(120).max(400),
+  hidden: z.boolean(),
+});
 
 export function registerWorkspaceIpc(store: WorkspaceStore): void {
   ipcMain.handle(IPC.workspaceGet, async (): Promise<Workspace> => {
@@ -35,6 +39,19 @@ export function registerWorkspaceIpc(store: WorkspaceStore): void {
     async (_event, activeId: unknown): Promise<void> => {
       const validated = ActivePayload.parse(activeId);
       const next = { ...store.current(), activeId: validated };
+      store.set(next);
+    },
+  );
+
+  ipcMain.handle(
+    IPC.workspaceSetSidebar,
+    async (_event, state: unknown): Promise<void> => {
+      const validated = SidebarPayload.parse(state);
+      const next = {
+        ...store.current(),
+        sidebarWidth: validated.width,
+        sidebarHidden: validated.hidden,
+      };
       store.set(next);
     },
   );

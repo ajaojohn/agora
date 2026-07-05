@@ -23,6 +23,7 @@ export const IPC = {
   workspaceGet: "workspace:get",
   workspaceSetTabs: "workspace:setTabs",
   workspaceSetActive: "workspace:setActive",
+  workspaceSetSidebar: "workspace:setSidebar",
   cwdExists: "cwd:exists",
   // One-way main -> renderer event (uses send/on, not invoke/handle).
   menuNewWorkspace: "menu:newWorkspace",
@@ -68,8 +69,17 @@ export const WorkspaceSchema = z.object({
   tabs: z.array(TabSchema),
   activeId: z.string().nullable(),
   codeServerPort: z.number().int().positive().optional(),
+  // Sidebar layout. Optional so pre-existing workspace.json files parse.
+  sidebarWidth: z.number().int().positive().optional(),
+  sidebarHidden: z.boolean().optional(),
 });
 export type Workspace = z.infer<typeof WorkspaceSchema>;
+
+// Payload of workspace:setSidebar -- renderer-owned sidebar layout.
+export interface SidebarState {
+  width: number;
+  hidden: boolean;
+}
 
 export const EMPTY_WORKSPACE: Workspace = { tabs: [], activeId: null };
 
@@ -100,6 +110,7 @@ export interface RendererApi {
   getWorkspace(): Promise<Workspace>;
   setWorkspaceTabs(tabs: Tab[]): Promise<void>;
   setWorkspaceActive(activeId: string | null): Promise<void>;
+  setWorkspaceSidebar(state: SidebarState): Promise<void>;
   // Server-side fs.access check. Used by the renderer's spawn flow to give
   // a clearer "Folder no longer exists" error before attempting a code-
   // server spawn that would fail anyway.
