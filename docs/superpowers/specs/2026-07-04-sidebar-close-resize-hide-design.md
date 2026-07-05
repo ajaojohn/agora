@@ -11,7 +11,8 @@ including full hide.
 - A small `×` button appears on each tab row **on hover only**, right-aligned,
   occupying the same slot as the loading spinner / error dot (on hover the ×
   replaces the indicator — browser-tab idiom).
-- The existing right-click context menu keeps its Close item.
+- (Superseded later in the branch: the right-click context menu was removed
+  once the hover × and Ctrl+Cmd+W landed -- it duplicated both.)
 - Both paths call the same `close()` in `App.tsx`.
 
 ### Confirm rule

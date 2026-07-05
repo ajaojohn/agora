@@ -1,12 +1,10 @@
 // Vertical tab bar -- one row per persisted project, "+" at the bottom.
-// Right-click on a row pops a context menu with a single Close action.
+// Close paths: hover x on each row, or the File menu / Ctrl+Cmd+W.
 // Closing destroys the tab's view; server-side terminal processes keep
-// running until app quit (shared code-server). Click anywhere else
-// dismisses.
+// running until app quit (shared code-server).
 //
 // Per-tab visual state is driven entirely by props -- this component
-// owns no session state, just the open-context-menu coordinates.
-import { useEffect, useState } from "react";
+// owns no state of its own.
 import type { Tab } from "@shared/ipc";
 import type { TabState } from "./App";
 import { basename } from "./util";
@@ -21,12 +19,6 @@ interface Props {
   onAdd: () => void;
 }
 
-interface MenuPos {
-  tabId: string;
-  x: number;
-  y: number;
-}
-
 export function TabBar({
   tabs,
   activeId,
@@ -36,26 +28,6 @@ export function TabBar({
   onClose,
   onAdd,
 }: Props) {
-  const [menu, setMenu] = useState<MenuPos | null>(null);
-
-  // Dismiss menu on any click outside / Escape. Listener attached only
-  // while menu is open to avoid wasted handler calls during normal use.
-  useEffect(() => {
-    if (!menu) return;
-    function dismiss() {
-      setMenu(null);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenu(null);
-    }
-    window.addEventListener("mousedown", dismiss);
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("mousedown", dismiss);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [menu]);
-
   return (
     <div className="tab-bar" style={{ width }}>
       <div className="tab-list">
@@ -68,14 +40,6 @@ export function TabBar({
               className={tabClassName(state, isActive)}
               title={tab.cwd}
               onClick={() => onActivate(tab)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                // mousedown listener inside the menu effect would dismiss
-                // immediately if we just set menu in the bubbling phase --
-                // stop propagation so the menu opens instead.
-                e.stopPropagation();
-                setMenu({ tabId: tab.id, x: e.clientX, y: e.clientY });
-              }}
             >
               <span className="tab-label">{basename(tab.cwd)}</span>
               {state &&
@@ -103,25 +67,6 @@ export function TabBar({
       <button className="tab-add" onClick={onAdd} title="Open Folder (Cmd+T)">
         +
       </button>
-      {menu && (
-        <div
-          className="context-menu"
-          style={{ left: menu.x, top: menu.y }}
-          // Don't dismiss when clicking the menu itself; the global listener
-          // covers everywhere else.
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={() => {
-              const tab = tabs.find((t) => t.id === menu.tabId);
-              setMenu(null);
-              if (tab) onClose(tab);
-            }}
-          >
-            Close
-          </button>
-        </div>
-      )}
     </div>
   );
 }

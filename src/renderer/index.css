@@ -274,36 +274,3 @@ button:hover {
   background: rgba(128, 128, 128, 0.08);
   border-style: solid;
 }
-
-/* Context menu -- positioned at click coords. position:fixed because the
-   z-index needs to escape the tab-bar stacking context. */
-.context-menu {
-  position: fixed;
-  min-width: 120px;
-  background: #fff;
-  border: 1px solid rgba(128, 128, 128, 0.4);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 4px;
-  z-index: 1000;
-}
-@media (prefers-color-scheme: dark) {
-  .context-menu {
-    background: #2a2a2a;
-  }
-}
-.context-menu button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 12px;
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  cursor: pointer;
-  color: inherit;
-  border-radius: 4px;
-}
-.context-menu button:hover {
-  background: rgba(128, 128, 128, 0.15);
-}
