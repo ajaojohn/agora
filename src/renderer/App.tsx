@@ -306,6 +306,21 @@ export function App() {
     [],
   );
 
+  // Menu-driven close of the active tab. Ref indirection for the same
+  // stale-closure reason as openRef above; close() itself shows the
+  // confirm sheet for live tabs.
+  function closeActiveTab(): void {
+    if (activeId === null) return;
+    const tab = tabs.find((t) => t.id === activeId);
+    if (tab) void close(tab);
+  }
+  const closeActiveRef = useRef(closeActiveTab);
+  closeActiveRef.current = closeActiveTab;
+  useEffect(
+    () => window.api.onMenuCloseTab(() => closeActiveRef.current()),
+    [],
+  );
+
   // Window title: Mac convention is "<app> — <doc>". Empty when no active.
   useEffect(() => {
     if (activeId !== null) {

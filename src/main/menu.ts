@@ -27,6 +27,14 @@ export function installApplicationMenu(
             getMainWindow()?.webContents.send(IPC.menuNewWorkspace);
           },
         },
+        {
+          id: "agora:closeTab",
+          label: "Close Workspace",
+          accelerator: "Ctrl+Cmd+W",
+          click: () => {
+            getMainWindow()?.webContents.send(IPC.menuCloseTab);
+          },
+        },
       ],
     },
     { role: "editMenu" },

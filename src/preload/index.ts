@@ -28,6 +28,10 @@ const api: RendererApi = {
     ipcRenderer.on(IPC.menuToggleSidebar, cb);
     return () => ipcRenderer.removeListener(IPC.menuToggleSidebar, cb);
   },
+  onMenuCloseTab: (cb) => {
+    ipcRenderer.on(IPC.menuCloseTab, cb);
+    return () => ipcRenderer.removeListener(IPC.menuCloseTab, cb);
+  },
 };
 
 // Puts `api` on the renderer's `window` as `window.api`.

@@ -28,6 +28,7 @@ export const IPC = {
   // One-way main -> renderer event (uses send/on, not invoke/handle).
   menuNewWorkspace: "menu:newWorkspace",
   menuToggleSidebar: "menu:toggleSidebar",
+  menuCloseTab: "menu:closeTab",
 } as const;
 
 export type PickFolderResponse = { path: string } | null;
@@ -118,4 +119,5 @@ export interface RendererApi {
   cwdExists(cwd: string): Promise<boolean>;
   onMenuNewWorkspace(cb: () => void): () => void;
   onMenuToggleSidebar(cb: () => void): () => void;
+  onMenuCloseTab(cb: () => void): () => void;
 }
