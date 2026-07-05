@@ -64,7 +64,7 @@ export function TabBar({
           );
         })}
       </div>
-      <button className="tab-add" onClick={onAdd} title="Open Folder (Cmd+T)">
+      <button className="tab-add" onClick={onAdd} title="New Workspace (⌃⌘N)">
         +
       </button>
     </div>

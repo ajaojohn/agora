@@ -148,8 +148,10 @@ just-created view + session and discard the state update.
   confirm closes, cancel keeps), close while loading (no leaked hidden view —
   session list empty after close), drag resize + clamp, drag-past-min
   snap-hide, chevron-click hide/show, edge-strip reveal, Cmd+Ctrl+B toggle with
-  editor focused (VS Code Cmd+B still works inside the editor), Cmd+Shift+N
-  still opens the folder picker with editor focused (dispatcher regression),
+  editor focused (VS Code Cmd+B still works inside the editor), Ctrl+Cmd+N
+  still opens the folder picker with editor focused (dispatcher regression;
+  moved off Cmd+Shift+N to keep all shell shortcuts in the Ctrl+Cmd
+  namespace and hand Cmd+Shift+N back to VS Code),
   relaunch restores width/hidden.
 - Empirical close-semantics check: start `sleep 600` in a tab's integrated
   terminal, close the tab, `pgrep -f "sleep 600"` — expect survival; reopen

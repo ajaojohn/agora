@@ -1,7 +1,8 @@
-// macOS application menu. Standard role-based defaults plus a File menu
-// with "New Workspace..." (Cmd+Shift+N) and a custom View menu with
-// "Toggle Sidebar" (Cmd+Ctrl+B). Items whose `id` starts with "agora:" are
-// also dispatched by menuAccelerators.ts when a code-server view has focus.
+// macOS application menu. Standard role-based defaults plus custom File and
+// View items. Agora shell shortcuts all live in the Ctrl+Cmd namespace so
+// they can never collide with VS Code's own keys. Items whose `id` starts
+// with "agora:" are also dispatched by menuAccelerators.ts when a
+// code-server view has focus.
 import {
   Menu,
   type BrowserWindow,
@@ -20,7 +21,7 @@ export function installApplicationMenu(
         {
           id: "agora:newWorkspace",
           label: "New Workspace...",
-          accelerator: "CmdOrCtrl+Shift+N",
+          accelerator: "Ctrl+Cmd+N",
           click: () => {
             // Target the shell window, not the focused webContents -- a
             // code-server view has no preload bridge to receive on.
