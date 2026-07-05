@@ -75,22 +75,26 @@ export class ViewManager {
       return;
     }
 
-    // Lazy first-attach: create view + load URL if we've never seen this
-    // sessionId before.
+    // Lazy first-attach: if we've never seen this sessionId, create the
+    // view and load the URL. A brand-new view has never been measured by
+    // the renderer, so start it full-window; the renderer sends the real
+    // bounds via setBounds moments later.
     if (!this.views.has(sessionId)) {
       if (port === undefined || cwd === undefined) {
         throw new Error(
           `setActive(${sessionId}): port + cwd required for first-time attach`,
         );
       }
-      await this.attachInternal(sessionId, port, cwd);
+      const view = await this.attachInternal(sessionId, port, cwd);
+      const [windowWidth, windowHeight] = parent.getContentSize();
+      view.setBounds({ x: 0, y: 0, width: windowWidth, height: windowHeight });
     }
 
-    // Show: add to parent's contentView with default bounds (renderer will
-    // refine via setBounds once it has measured the visible region).
+    // Show: re-shows keep the view's last reported bounds. Resetting to
+    // full-window here would paint the view over the sidebar until the
+    // renderer's next resize report -- which never comes when the layout
+    // didn't change (e.g. restoring the view after a sidebar drag).
     const record = this.views.get(sessionId)!;
-    const [width, height] = parent.getContentSize();
-    record.view.setBounds({ x: 0, y: 0, width, height });
     parent.contentView.addChildView(record.view);
     record.parent = parent;
     this.activeSessionId = sessionId;
@@ -126,8 +130,8 @@ export class ViewManager {
     }
   }
 
-  // Creates the view and loads the URL but does NOT add to any parent's
-  // contentView. Caller (setActive) handles attaching after this resolves.
+  // Creates the view, loads the URL, and returns the view -- but does NOT
+  // add it to any parent's contentView. Caller (setActive) handles that.
   // Rolls back the map entry on load failure so a retry is a fresh attempt.
   //
   // The ?folder= query param forces VS Code to open `cwd` regardless of
@@ -138,7 +142,7 @@ export class ViewManager {
     sessionId: string,
     port: number,
     cwd: string,
-  ): Promise<void> {
+  ): Promise<WebContentsView> {
     await waitForPort(port);
 
     const view = new WebContentsView({
@@ -179,6 +183,7 @@ export class ViewManager {
       view.webContents.close();
       throw err;
     }
+    return view;
   }
 }
 
