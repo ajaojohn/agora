@@ -161,6 +161,16 @@ export function App() {
   // active to right neighbor (fall back to left, fall back to no-active),
   // persist. order is recomputed so the persisted indices stay contiguous.
   async function close(tab: Tab): Promise<void> {
+    const liveState = perTabState.get(tab.id);
+    const live =
+      typeof liveState === "object" &&
+      (liveState.kind === "loaded" || liveState.kind === "loading");
+    // Only live tabs get the sheet -- unspawned/error have nothing running.
+    if (live) {
+      const confirmed = await window.api.confirmCloseTab(tab.cwd);
+      if (!confirmed) return;
+    }
+
     const idx = tabs.findIndex((t) => t.id === tab.id);
     const wasActive = activeId === tab.id;
     const nextActive: string | null = wasActive
