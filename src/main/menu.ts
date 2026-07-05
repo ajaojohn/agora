@@ -17,6 +17,7 @@ export function installApplicationMenu(
       label: "File",
       submenu: [
         {
+          id: "agora:newWorkspace",
           label: "New Workspace...",
           accelerator: "CmdOrCtrl+Shift+N",
           click: () => {
