@@ -27,6 +27,7 @@ export const IPC = {
   cwdExists: "cwd:exists",
   // One-way main -> renderer event (uses send/on, not invoke/handle).
   menuNewWorkspace: "menu:newWorkspace",
+  menuToggleSidebar: "menu:toggleSidebar",
 } as const;
 
 export type PickFolderResponse = { path: string } | null;
@@ -116,4 +117,5 @@ export interface RendererApi {
   // server spawn that would fail anyway.
   cwdExists(cwd: string): Promise<boolean>;
   onMenuNewWorkspace(cb: () => void): () => void;
+  onMenuToggleSidebar(cb: () => void): () => void;
 }

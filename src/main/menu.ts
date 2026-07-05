@@ -1,6 +1,7 @@
 // macOS application menu. Standard role-based defaults plus a File menu
-// with "New Workspace..." (Cmd+Shift+N). The accelerator must live on a
-// menu item so it preempts code-server's own Cmd+Shift+N handler.
+// with "New Workspace..." (Cmd+Shift+N) and a custom View menu with
+// "Toggle Sidebar" (Cmd+Ctrl+B). Items whose `id` starts with "agora:" are
+// also dispatched by menuAccelerators.ts when a code-server view has focus.
 import {
   Menu,
   type BrowserWindow,
@@ -29,7 +30,29 @@ export function installApplicationMenu(
       ],
     },
     { role: "editMenu" },
-    { role: "viewMenu" },
+    {
+      label: "View",
+      submenu: [
+        {
+          id: "agora:toggleSidebar",
+          label: "Toggle Sidebar",
+          accelerator: "Cmd+Ctrl+B",
+          click: () => {
+            getMainWindow()?.webContents.send(IPC.menuToggleSidebar);
+          },
+        },
+        { type: "separator" },
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
     { role: "windowMenu" },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));

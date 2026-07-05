@@ -285,6 +285,13 @@ export function App() {
     [],
   );
 
+  const toggleSidebarRef = useRef(toggleSidebar);
+  toggleSidebarRef.current = toggleSidebar;
+  useEffect(
+    () => window.api.onMenuToggleSidebar(() => toggleSidebarRef.current()),
+    [],
+  );
+
   // Window title: Mac convention is "<app> — <doc>". Empty when no active.
   useEffect(() => {
     if (activeId !== null) {
