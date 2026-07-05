@@ -93,7 +93,10 @@ async function bootstrap(): Promise<void> {
     registerSessionIpc(sessionManager);
     registerViewIpc(viewManager, sessionManager);
     registerWorkspaceIpc(workspaceStore);
-    installApplicationMenu(() => mainWindow);
+    installApplicationMenu(
+      () => mainWindow,
+      () => viewManager?.reloadActive(),
+    );
   } catch (err) {
     if (err instanceof CodeServerNotFoundError) {
       dialog.showErrorBox("code-server not found", err.message);

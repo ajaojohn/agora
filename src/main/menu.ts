@@ -12,6 +12,7 @@ import { IPC } from "@shared/ipc";
 
 export function installApplicationMenu(
   getMainWindow: () => BrowserWindow | null,
+  onReloadEditor: () => void,
 ): void {
   const template: MenuItemConstructorOptions[] = [
     { role: "appMenu" },
@@ -49,6 +50,12 @@ export function installApplicationMenu(
           click: () => {
             getMainWindow()?.webContents.send(IPC.menuToggleSidebar);
           },
+        },
+        {
+          id: "agora:reloadEditor",
+          label: "Reload Editor",
+          accelerator: "Ctrl+Cmd+R",
+          click: () => onReloadEditor(),
         },
         { type: "separator" },
         { role: "reload" },

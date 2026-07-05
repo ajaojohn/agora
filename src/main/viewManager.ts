@@ -108,6 +108,23 @@ export class ViewManager {
     record.view.setBounds(bounds);
   }
 
+  // Session with a user-initiated reload in flight. Its beforeunload veto
+  // gets overridden in the will-prevent-unload handler. Timestamped so the
+  // mark self-expires -- an un-vetoed reload leaves no stale mark that
+  // could override some future unrelated veto.
+  private pendingReload: { sessionId: string; at: number } | null = null;
+
+  // Reloads the active view's workbench. Escape hatch for a wedged editor
+  // and for picking up settings changed from another tab (issue #17) --
+  // the view has no browser chrome of its own to reload with.
+  reloadActive(): void {
+    if (this.activeSessionId === null) return;
+    const record = this.views.get(this.activeSessionId);
+    if (!record) return;
+    this.pendingReload = { sessionId: this.activeSessionId, at: Date.now() };
+    record.view.webContents.reload();
+  }
+
   // Permanent destroy -- removes from parent if attached, closes webContents,
   // forgets the session. If the closed view was active, clears activeSessionId.
   // Use on close-tab; for hide-but-keep-alive use setActive(null) or setActive(otherId).
@@ -171,6 +188,23 @@ export class ViewManager {
     view.webContents.on("before-input-event", (event, input) => {
       if (input.type !== "keyDown") return;
       if (dispatchMenuAccelerator(input)) event.preventDefault();
+    });
+
+    // VS Code web vetoes unload after recent keyboard use
+    // (window.confirmBeforeClose: "keyboardOnly"); unhandled, the veto
+    // silently cancels webContents.reload(). An explicit Reload Editor is
+    // user intent, so override the veto for exactly that reload -- hot exit
+    // restores dirty buffers after the reload. All other vetoes stand.
+    view.webContents.on("will-prevent-unload", (event) => {
+      const pending = this.pendingReload;
+      if (
+        pending !== null &&
+        pending.sessionId === sessionId &&
+        Date.now() - pending.at < 1000
+      ) {
+        this.pendingReload = null;
+        event.preventDefault();
+      }
     });
 
     this.views.set(sessionId, { view, parent: null });
