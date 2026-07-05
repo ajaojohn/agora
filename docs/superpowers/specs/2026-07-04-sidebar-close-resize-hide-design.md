@@ -62,7 +62,9 @@ just-created view + session and discard the state update.
   cursor, pointer-event based.
 - Width clamped to **120–400px**.
 - Dragging below ~80px snaps the sidebar to hidden (VS Code idiom).
-- Double-click on the handle toggles hidden.
+- A small always-visible `‹` chevron pill centered on the handle toggles
+  hidden (replaced the original double-click, which fired accidentally on
+  repeated drag attempts).
 - **View hidden during drag**: on drag start the renderer calls
   `setActiveView(null)` (webContents stays alive), on pointer-up it restores
   the active session's view — instant, no reload. Required because the
@@ -74,8 +76,9 @@ just-created view + session and discard the state update.
 
 ### Hide / show
 
-- Hidden state: tab bar unmounted from layout; a thin (~8px) clickable strip
-  remains at the window's left edge; clicking it shows the sidebar again.
+- Hidden state: tab bar unmounted from layout; a thin (~12px) clickable strip
+  with a `›` chevron remains at the window's left edge; clicking it shows
+  the sidebar again.
 - Menu item `View → Toggle Sidebar`, accelerator **Cmd+Ctrl+B** (unbound in
   VS Code — Cmd+B and Cmd+Option+B are VS Code's own sidebar toggles and an
   app-menu accelerator would steal them from the editor).
@@ -143,7 +146,7 @@ just-created view + session and discard the state update.
 - Manual run: close unspawned tab (instant), close loaded tab (sheet →
   confirm closes, cancel keeps), close while loading (no leaked hidden view —
   session list empty after close), drag resize + clamp, drag-past-min
-  snap-hide, double-click hide, edge-strip reveal, Cmd+Ctrl+B toggle with
+  snap-hide, chevron-click hide/show, edge-strip reveal, Cmd+Ctrl+B toggle with
   editor focused (VS Code Cmd+B still works inside the editor), Cmd+Shift+N
   still opens the folder picker with editor focused (dispatcher regression),
   relaunch restores width/hidden.

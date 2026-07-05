@@ -338,16 +338,26 @@ export function App() {
               e.preventDefault();
               startSidebarDrag();
             }}
-            onDoubleClick={toggleSidebar}
-          />
+          >
+            <button
+              className="sidebar-chevron"
+              title="Hide Sidebar (⌃⌘B)"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={toggleSidebar}
+            >
+              ‹
+            </button>
+          </div>
         </>
       )}
       {sidebarHidden && (
         <div
           className="sidebar-reveal"
-          title="Show Sidebar"
+          title="Show Sidebar (⌃⌘B)"
           onClick={toggleSidebar}
-        />
+        >
+          ›
+        </div>
       )}
       {sidebarDragging && <div className="drag-shield" />}
       <div className="content">
