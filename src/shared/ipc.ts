@@ -13,6 +13,7 @@ import { z } from "zod";
 
 export const IPC = {
   dialogPickFolder: "dialog:pickFolder",
+  dialogConfirmCloseTab: "dialog:confirmCloseTab",
   sessionCreate: "session:create",
   sessionClose: "session:close",
   sessionList: "session:list",
@@ -74,6 +75,10 @@ export const EMPTY_WORKSPACE: Workspace = { tabs: [], activeId: null };
 
 export interface RendererApi {
   pickFolder(): Promise<PickFolderResponse>;
+  // Native sheet asking to close a live tab. Resolves true when the user
+  // confirms. Close is non-destructive server-side (terminals keep running
+  // until app quit); the sheet guards losing sight of a live agent.
+  confirmCloseTab(cwd: string): Promise<boolean>;
   createSession(cwd: string): Promise<Session>;
   closeSession(sessionId: string): Promise<void>;
   listSessions(): Promise<Session[]>;
