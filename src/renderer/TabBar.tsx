@@ -31,7 +31,7 @@ export function TabBar({
   return (
     <div className="tab-bar" style={{ width }}>
       <div className="tab-list">
-        {tabs.map((tab) => {
+        {tabs.map((tab, i) => {
           const state = perTabState.get(tab.id);
           const isActive = tab.id === activeId;
           return (
@@ -41,6 +41,8 @@ export function TabBar({
               title={tab.cwd}
               onClick={() => onActivate(tab)}
             >
+              {/* ⌃⌘1..9 jump targets -- number only the reachable rows. */}
+              <span className="tab-index">{i < 9 ? i + 1 : ""}</span>
               <span className="tab-label">{basename(tab.cwd)}</span>
               {state &&
                 typeof state === "object" &&

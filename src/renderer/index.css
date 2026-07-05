@@ -194,6 +194,24 @@ button:hover {
   background: rgba(128, 128, 128, 0.08);
 }
 
+/* Jump-shortcut index (⌃⌘1..9) as a small keycap badge. Rows past 9
+   keep the empty slot so labels align. */
+.tab-index {
+  flex: 0 0 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  opacity: 0.55;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.18);
+  font-variant-numeric: tabular-nums;
+}
+.tab-index:empty {
+  background: transparent;
+}
+
 .tab-label {
   flex: 1;
   overflow: hidden;
