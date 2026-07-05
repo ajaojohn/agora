@@ -24,4 +24,25 @@ export function registerDialogIpc(): void {
       return { path: result.filePaths[0] };
     },
   );
+  ipcMain.handle(
+    IPC.dialogConfirmCloseTab,
+    async (_event, cwd: unknown): Promise<boolean> => {
+      const folder = typeof cwd === "string" ? cwd : "";
+      const name = folder.split("/").filter(Boolean).pop() ?? "this project";
+      const opts: Electron.MessageBoxOptions = {
+        type: "warning",
+        buttons: ["Close Project", "Cancel"],
+        defaultId: 0,
+        cancelId: 1,
+        message: `Close "${name}"?`,
+        detail:
+          "Anything running in its terminals keeps running in the background until Agora quits.",
+      };
+      const parent = BrowserWindow.getFocusedWindow();
+      const result = parent
+        ? await dialog.showMessageBox(parent, opts)
+        : await dialog.showMessageBox(opts);
+      return result.response === 0;
+    },
+  );
 }

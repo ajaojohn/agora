@@ -113,6 +113,67 @@ button:hover {
   position: relative;
 }
 
+/* Resize handle: 5px strip overlapping the sidebar's right edge so it adds
+   no layout width. */
+.sidebar-handle {
+  flex: 0 0 5px;
+  margin-left: -5px;
+  cursor: col-resize;
+  z-index: 10;
+  position: relative;
+}
+.sidebar-handle:hover {
+  background: rgba(74, 158, 255, 0.4);
+}
+
+/* Collapse chevron: small always-visible pill centered on the divider. */
+.sidebar-chevron {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(128, 128, 128, 0.35);
+  border-radius: 8px;
+  background: rgba(128, 128, 128, 0.12);
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.55;
+}
+.sidebar-chevron:hover {
+  opacity: 1;
+  background: rgba(74, 158, 255, 0.25);
+}
+
+/* Covers the page during a sidebar drag (the editor view is hidden for the
+   gesture) -- keeps the col-resize cursor and blocks stray selection. */
+.drag-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  cursor: col-resize;
+}
+
+/* Left-edge reveal strip shown while the sidebar is hidden. */
+.sidebar-reveal {
+  flex: 0 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-right: 1px solid rgba(128, 128, 128, 0.25);
+  background: rgba(128, 128, 128, 0.05);
+  color: rgba(128, 128, 128, 0.9);
+  font-size: 11px;
+  user-select: none;
+}
+.sidebar-reveal:hover {
+  background: rgba(74, 158, 255, 0.2);
+}
+
 .tab-list {
   flex: 1;
   overflow-y: auto;
@@ -131,6 +192,24 @@ button:hover {
 }
 .tab:hover {
   background: rgba(128, 128, 128, 0.08);
+}
+
+/* Jump-shortcut index (⌃⌘1..9) as a small keycap badge. Rows past 9
+   keep the empty slot so labels align. */
+.tab-index {
+  flex: 0 0 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  opacity: 0.55;
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.18);
+  font-variant-numeric: tabular-nums;
+}
+.tab-index:empty {
+  background: transparent;
 }
 
 .tab-label {
@@ -173,6 +252,31 @@ button:hover {
   background: #c33;
 }
 
+/* Hover-only close button. Shares the indicator slot: on row hover the
+   spinner/error dot yields to the ×. */
+.tab-close {
+  display: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+}
+.tab:hover .tab-close {
+  display: block;
+}
+.tab:hover .tab-spinner,
+.tab:hover .tab-error-dot {
+  display: none;
+}
+.tab-close:hover {
+  background: rgba(128, 128, 128, 0.25);
+}
+
 .tab-add {
   margin: 8px;
   padding: 6px;
@@ -187,37 +291,4 @@ button:hover {
 .tab-add:hover {
   background: rgba(128, 128, 128, 0.08);
   border-style: solid;
-}
-
-/* Context menu -- positioned at click coords. position:fixed because the
-   z-index needs to escape the tab-bar stacking context. */
-.context-menu {
-  position: fixed;
-  min-width: 120px;
-  background: #fff;
-  border: 1px solid rgba(128, 128, 128, 0.4);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 4px;
-  z-index: 1000;
-}
-@media (prefers-color-scheme: dark) {
-  .context-menu {
-    background: #2a2a2a;
-  }
-}
-.context-menu button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 6px 12px;
-  border: none;
-  background: transparent;
-  font-size: 13px;
-  cursor: pointer;
-  color: inherit;
-  border-radius: 4px;
-}
-.context-menu button:hover {
-  background: rgba(128, 128, 128, 0.15);
 }

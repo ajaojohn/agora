@@ -24,12 +24,47 @@ export type TabState =
   | { kind: "loaded"; session: Session }
   | { kind: "error"; message: string };
 
+const SIDEBAR_MIN_PX = 120;
+const SIDEBAR_MAX_PX = 400;
+const SIDEBAR_DEFAULT_PX = 200;
+const SIDEBAR_SNAP_HIDE_PX = 80;
+
+function clampSidebarWidth(px: number): number {
+  const max = Math.min(SIDEBAR_MAX_PX, Math.floor(window.innerWidth / 2));
+  return Math.min(max, Math.max(SIDEBAR_MIN_PX, Math.round(px)));
+}
+
 export function App() {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [perTabState, setPerTabState] = useState<Map<string, TabState>>(
     () => new Map(),
   );
+
+  // Ref mirror of tabs -- spawn() completions race against close(); they
+  // must check tab membership at resolution time, not capture time.
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_PX);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [sidebarDragging, setSidebarDragging] = useState(false);
+  // Mirrors for the drag effect -- its closures must see current values at
+  // pointer-up, not the values captured when the drag started.
+  const sidebarRef = useRef({ width: SIDEBAR_DEFAULT_PX, hidden: false });
+  sidebarRef.current = { width: sidebarWidth, hidden: sidebarHidden };
+  // Loaded active session, or null. Drag start/end hides/restores its view:
+  // the WebContentsView is a native layer no DOM overlay can cover, so
+  // pointer events die when the cursor crosses into it mid-drag.
+  const activeSessionRef = useRef<string | null>(null);
+  const activeStateNow =
+    activeId !== null ? perTabState.get(activeId) : undefined;
+  activeSessionRef.current =
+    activeStateNow !== undefined &&
+    typeof activeStateNow === "object" &&
+    activeStateNow.kind === "loaded"
+      ? activeStateNow.session.sessionId
+      : null;
 
   // Mount: hydrate from persisted workspace, then spawn the previously-active
   // tab eagerly (hybrid spawn -- other tabs stay unspawned until clicked).
@@ -40,6 +75,8 @@ export function App() {
       if (cancelled) return;
       setTabs(ws.tabs);
       setActiveId(ws.activeId);
+      setSidebarWidth(clampSidebarWidth(ws.sidebarWidth ?? SIDEBAR_DEFAULT_PX));
+      setSidebarHidden(ws.sidebarHidden ?? false);
       setPerTabState(() => {
         const initial = new Map<string, TabState>();
         for (const tab of ws.tabs) initial.set(tab.id, "unspawned");
@@ -59,13 +96,18 @@ export function App() {
 
   // Spawn a tab: pre-check cwd existence, then createSession + setActiveView.
   // Updates perTabState through each phase. cwd-vanished gets a clearer
-  // message (Q14 cwd-vanished special case). If createSession succeeds but
-  // setActiveView fails, we close the orphan session before throwing so a
-  // retry doesn't leak code-server children.
+  // message (Q14 cwd-vanished special case). Every await is a window for the
+  // user to close the tab, so each landing checks `gone()` -- a completed
+  // spawn for a closed tab must tear down its view + session instead of
+  // re-inserting state for a deleted id.
   async function spawn(tab: Tab): Promise<void> {
     setPerTabState((prev) => new Map(prev).set(tab.id, { kind: "loading" }));
 
-    if (!(await window.api.cwdExists(tab.cwd))) {
+    const gone = (): boolean => !tabsRef.current.some((t) => t.id === tab.id);
+
+    const cwdOk = await window.api.cwdExists(tab.cwd);
+    if (gone()) return;
+    if (!cwdOk) {
       setPerTabState((prev) =>
         new Map(prev).set(tab.id, {
           kind: "error",
@@ -79,20 +121,84 @@ export function App() {
     try {
       session = await window.api.createSession(tab.cwd);
       await window.api.setActiveView(session.sessionId);
+      if (gone()) {
+        // Tab closed mid-spawn: destroy the view + session that just came
+        // up so they don't leak as a hidden webContents + stale record.
+        await window.api.closeView(session.sessionId);
+        await window.api.closeSession(session.sessionId);
+        return;
+      }
       setPerTabState((prev) =>
         new Map(prev).set(tab.id, { kind: "loaded", session: session! }),
       );
     } catch (err) {
       if (session) {
         await window.api.closeSession(session.sessionId).catch(() => {
-          // best-effort -- if cleanup fails the child will be killed at app quit anyway
+          // best-effort -- the stale record is dropped at app quit anyway
         });
       }
+      if (gone()) return;
       const message = err instanceof Error ? err.message : String(err);
       setPerTabState((prev) =>
         new Map(prev).set(tab.id, { kind: "error", message }),
       );
     }
+  }
+
+  // Sidebar drag: window-level listeners so the gesture survives the cursor
+  // leaving the 5px handle. Termination is defensive: pointerup is the
+  // normal path, but pointercancel, window blur (Cmd+Tab mid-drag), and a
+  // buttons-free move also end it -- a stuck drag would leave the
+  // full-screen shield blocking all mouse input.
+  useEffect(() => {
+    if (!sidebarDragging) return;
+    let ended = false;
+    function endDrag(): void {
+      if (ended) return;
+      ended = true;
+      setSidebarDragging(false);
+      const { width, hidden } = sidebarRef.current;
+      void window.api.setWorkspaceSidebar({ width, hidden });
+      if (activeSessionRef.current) {
+        void window.api.setActiveView(activeSessionRef.current);
+      }
+    }
+    function onMove(e: PointerEvent): void {
+      if (e.buttons === 0) {
+        endDrag();
+        return;
+      }
+      if (e.clientX < SIDEBAR_SNAP_HIDE_PX) {
+        setSidebarHidden(true);
+        return;
+      }
+      setSidebarHidden(false);
+      setSidebarWidth(clampSidebarWidth(e.clientX));
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+    window.addEventListener("blur", endDrag);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", endDrag);
+      window.removeEventListener("pointercancel", endDrag);
+      window.removeEventListener("blur", endDrag);
+    };
+  }, [sidebarDragging]);
+
+  function startSidebarDrag(): void {
+    if (activeSessionRef.current) void window.api.setActiveView(null);
+    setSidebarDragging(true);
+  }
+
+  function toggleSidebar(): void {
+    const hidden = !sidebarRef.current.hidden;
+    setSidebarHidden(hidden);
+    void window.api.setWorkspaceSidebar({
+      width: sidebarRef.current.width,
+      hidden,
+    });
   }
 
   // Make `tab` the active tab. If already loaded, reuses the live view via
@@ -138,10 +244,21 @@ export function App() {
     await spawn(tab);
   }
 
-  // Close-tab: destroy view + kill code-server, remove from list, switch
+  // Close-tab: destroy view + drop the session record (the shared
+  // code-server keeps running for other tabs), remove from list, switch
   // active to right neighbor (fall back to left, fall back to no-active),
   // persist. order is recomputed so the persisted indices stay contiguous.
   async function close(tab: Tab): Promise<void> {
+    const liveState = perTabState.get(tab.id);
+    const live =
+      typeof liveState === "object" &&
+      (liveState.kind === "loaded" || liveState.kind === "loading");
+    // Only live tabs get the sheet -- unspawned/error have nothing running.
+    if (live) {
+      const confirmed = await window.api.confirmCloseTab(tab.cwd);
+      if (!confirmed) return;
+    }
+
     const idx = tabs.findIndex((t) => t.id === tab.id);
     const wasActive = activeId === tab.id;
     const nextActive: string | null = wasActive
@@ -182,6 +299,61 @@ export function App() {
     [],
   );
 
+  const toggleSidebarRef = useRef(toggleSidebar);
+  toggleSidebarRef.current = toggleSidebar;
+  useEffect(
+    () => window.api.onMenuToggleSidebar(() => toggleSidebarRef.current()),
+    [],
+  );
+
+  // Menu-driven close of the active tab. Ref indirection for the same
+  // stale-closure reason as openRef above; close() itself shows the
+  // confirm sheet for live tabs.
+  function closeActiveTab(): void {
+    if (activeId === null) return;
+    const tab = tabs.find((t) => t.id === activeId);
+    if (tab) void close(tab);
+  }
+  const closeActiveRef = useRef(closeActiveTab);
+  closeActiveRef.current = closeActiveTab;
+  useEffect(
+    () => window.api.onMenuCloseTab(() => closeActiveRef.current()),
+    [],
+  );
+
+  // Workspace switching from the menu. Cycle wraps in sidebar order; with
+  // no active tab it falls back to the first.
+  function cycleWorkspace(direction: 1 | -1): void {
+    if (tabs.length === 0) return;
+    const idx =
+      activeId !== null ? tabs.findIndex((t) => t.id === activeId) : -1;
+    if (idx === -1) {
+      void activate(tabs[0]);
+      return;
+    }
+    const next = tabs[(idx + direction + tabs.length) % tabs.length];
+    if (next.id !== activeId) void activate(next);
+  }
+
+  function jumpWorkspace(index: number): void {
+    const tab = tabs[index];
+    if (tab && tab.id !== activeId) void activate(tab);
+  }
+
+  const cycleWorkspaceRef = useRef(cycleWorkspace);
+  cycleWorkspaceRef.current = cycleWorkspace;
+  useEffect(
+    () => window.api.onMenuCycleWorkspace((d) => cycleWorkspaceRef.current(d)),
+    [],
+  );
+
+  const jumpWorkspaceRef = useRef(jumpWorkspace);
+  jumpWorkspaceRef.current = jumpWorkspace;
+  useEffect(
+    () => window.api.onMenuJumpWorkspace((i) => jumpWorkspaceRef.current(i)),
+    [],
+  );
+
   // Window title: Mac convention is "<app> — <doc>". Empty when no active.
   useEffect(() => {
     if (activeId !== null) {
@@ -197,14 +369,45 @@ export function App() {
 
   return (
     <div className="app">
-      <TabBar
-        tabs={tabs}
-        activeId={activeId}
-        perTabState={perTabState}
-        onActivate={activate}
-        onClose={close}
-        onAdd={open}
-      />
+      {!sidebarHidden && (
+        <>
+          <TabBar
+            tabs={tabs}
+            activeId={activeId}
+            perTabState={perTabState}
+            width={sidebarWidth}
+            onActivate={activate}
+            onClose={close}
+            onAdd={open}
+          />
+          <div
+            className="sidebar-handle"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              startSidebarDrag();
+            }}
+          >
+            <button
+              className="sidebar-chevron"
+              title="Hide Sidebar (⌃⌘B)"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={toggleSidebar}
+            >
+              ‹
+            </button>
+          </div>
+        </>
+      )}
+      {sidebarHidden && (
+        <div
+          className="sidebar-reveal"
+          title="Show Sidebar (⌃⌘B)"
+          onClick={toggleSidebar}
+        >
+          ›
+        </div>
+      )}
+      {sidebarDragging && <div className="drag-shield" />}
       <div className="content">
         {activeId === null && <EmptyHint onOpen={open} />}
         {activeId !== null && activeState === "unspawned" && (

@@ -13,6 +13,7 @@ import { z } from "zod";
 
 export const IPC = {
   dialogPickFolder: "dialog:pickFolder",
+  dialogConfirmCloseTab: "dialog:confirmCloseTab",
   sessionCreate: "session:create",
   sessionClose: "session:close",
   sessionList: "session:list",
@@ -22,9 +23,14 @@ export const IPC = {
   workspaceGet: "workspace:get",
   workspaceSetTabs: "workspace:setTabs",
   workspaceSetActive: "workspace:setActive",
+  workspaceSetSidebar: "workspace:setSidebar",
   cwdExists: "cwd:exists",
   // One-way main -> renderer event (uses send/on, not invoke/handle).
   menuNewWorkspace: "menu:newWorkspace",
+  menuToggleSidebar: "menu:toggleSidebar",
+  menuCloseTab: "menu:closeTab",
+  menuCycleWorkspace: "menu:cycleWorkspace",
+  menuJumpWorkspace: "menu:jumpWorkspace",
 } as const;
 
 export type PickFolderResponse = { path: string } | null;
@@ -67,13 +73,26 @@ export const WorkspaceSchema = z.object({
   tabs: z.array(TabSchema),
   activeId: z.string().nullable(),
   codeServerPort: z.number().int().positive().optional(),
+  // Sidebar layout. Optional so pre-existing workspace.json files parse.
+  sidebarWidth: z.number().int().positive().optional(),
+  sidebarHidden: z.boolean().optional(),
 });
 export type Workspace = z.infer<typeof WorkspaceSchema>;
+
+// Payload of workspace:setSidebar -- renderer-owned sidebar layout.
+export interface SidebarState {
+  width: number;
+  hidden: boolean;
+}
 
 export const EMPTY_WORKSPACE: Workspace = { tabs: [], activeId: null };
 
 export interface RendererApi {
   pickFolder(): Promise<PickFolderResponse>;
+  // Native sheet asking to close a live tab. Resolves true when the user
+  // confirms. Close is non-destructive server-side (terminals keep running
+  // until app quit); the sheet guards losing sight of a live agent.
+  confirmCloseTab(cwd: string): Promise<boolean>;
   createSession(cwd: string): Promise<Session>;
   closeSession(sessionId: string): Promise<void>;
   listSessions(): Promise<Session[]>;
@@ -95,9 +114,16 @@ export interface RendererApi {
   getWorkspace(): Promise<Workspace>;
   setWorkspaceTabs(tabs: Tab[]): Promise<void>;
   setWorkspaceActive(activeId: string | null): Promise<void>;
+  setWorkspaceSidebar(state: SidebarState): Promise<void>;
   // Server-side fs.access check. Used by the renderer's spawn flow to give
   // a clearer "Folder no longer exists" error before attempting a code-
   // server spawn that would fail anyway.
   cwdExists(cwd: string): Promise<boolean>;
   onMenuNewWorkspace(cb: () => void): () => void;
+  onMenuToggleSidebar(cb: () => void): () => void;
+  onMenuCloseTab(cb: () => void): () => void;
+  // direction: +1 next / -1 previous, wrapping in sidebar order.
+  onMenuCycleWorkspace(cb: (direction: 1 | -1) => void): () => void;
+  // index: 0-based position in sidebar order.
+  onMenuJumpWorkspace(cb: (index: number) => void): () => void;
 }

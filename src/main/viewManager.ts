@@ -15,7 +15,8 @@
 // telemetry extension will talk to main via a separate localhost WebSocket,
 // not the preload bridge.
 import { shell, WebContentsView, type BrowserWindow } from "electron";
-import { IPC, type ViewBounds } from "@shared/ipc";
+import { type ViewBounds } from "@shared/ipc";
+import { dispatchMenuAccelerator } from "./menuAccelerators";
 import { waitForPort } from "./tcpReady";
 
 interface ViewRecord {
@@ -39,8 +40,6 @@ export class ViewManager {
   // Currently-shown sessionId, or null if no view is foregrounded. Used by
   // setActive to know what to hide before showing the next.
   private activeSessionId: string | null = null;
-
-  constructor(private readonly getMainWindow: () => BrowserWindow | null) {}
 
   // High-level "switch the foregrounded view". Hides current active (keeps
   // its webContents alive), then either shows an already-attached view or
@@ -76,22 +75,26 @@ export class ViewManager {
       return;
     }
 
-    // Lazy first-attach: create view + load URL if we've never seen this
-    // sessionId before.
+    // Lazy first-attach: if we've never seen this sessionId, create the
+    // view and load the URL. A brand-new view has never been measured by
+    // the renderer, so start it full-window; the renderer sends the real
+    // bounds via setBounds moments later.
     if (!this.views.has(sessionId)) {
       if (port === undefined || cwd === undefined) {
         throw new Error(
           `setActive(${sessionId}): port + cwd required for first-time attach`,
         );
       }
-      await this.attachInternal(sessionId, port, cwd);
+      const view = await this.attachInternal(sessionId, port, cwd);
+      const [windowWidth, windowHeight] = parent.getContentSize();
+      view.setBounds({ x: 0, y: 0, width: windowWidth, height: windowHeight });
     }
 
-    // Show: add to parent's contentView with default bounds (renderer will
-    // refine via setBounds once it has measured the visible region).
+    // Show: re-shows keep the view's last reported bounds. Resetting to
+    // full-window here would paint the view over the sidebar until the
+    // renderer's next resize report -- which never comes when the layout
+    // didn't change (e.g. restoring the view after a sidebar drag).
     const record = this.views.get(sessionId)!;
-    const [width, height] = parent.getContentSize();
-    record.view.setBounds({ x: 0, y: 0, width, height });
     parent.contentView.addChildView(record.view);
     record.parent = parent;
     this.activeSessionId = sessionId;
@@ -103,6 +106,23 @@ export class ViewManager {
     const record = this.views.get(sessionId);
     if (!record) return;
     record.view.setBounds(bounds);
+  }
+
+  // Session with a user-initiated reload in flight. Its beforeunload veto
+  // gets overridden in the will-prevent-unload handler. Timestamped so the
+  // mark self-expires -- an un-vetoed reload leaves no stale mark that
+  // could override some future unrelated veto.
+  private pendingReload: { sessionId: string; at: number } | null = null;
+
+  // Reloads the active view's workbench. Escape hatch for a wedged editor
+  // and for picking up settings changed from another tab (issue #17) --
+  // the view has no browser chrome of its own to reload with.
+  reloadActive(): void {
+    if (this.activeSessionId === null) return;
+    const record = this.views.get(this.activeSessionId);
+    if (!record) return;
+    this.pendingReload = { sessionId: this.activeSessionId, at: Date.now() };
+    record.view.webContents.reload();
   }
 
   // Permanent destroy -- removes from parent if attached, closes webContents,
@@ -127,8 +147,8 @@ export class ViewManager {
     }
   }
 
-  // Creates the view and loads the URL but does NOT add to any parent's
-  // contentView. Caller (setActive) handles attaching after this resolves.
+  // Creates the view, loads the URL, and returns the view -- but does NOT
+  // add it to any parent's contentView. Caller (setActive) handles that.
   // Rolls back the map entry on load failure so a retry is a fresh attempt.
   //
   // The ?folder= query param forces VS Code to open `cwd` regardless of
@@ -139,7 +159,7 @@ export class ViewManager {
     sessionId: string,
     port: number,
     cwd: string,
-  ): Promise<void> {
+  ): Promise<WebContentsView> {
     await waitForPort(port);
 
     const view = new WebContentsView({
@@ -163,22 +183,27 @@ export class ViewManager {
       return { action: "deny" };
     });
 
-    // Chromium swallows Cmd+Shift+N before menu.ts's accelerator sees it
-    // when a view is focused. KEEP IN SYNC with menu.ts.
-    // TODO: when a second shortcut lands, replace this hardcoded match
-    // with a generic dispatcher that walks Menu.getApplicationMenu() and
-    // routes any accelerator match to the corresponding item's click.
+    // Chromium swallows keystrokes before menu accelerators run when a
+    // view is focused; route them through the menu's own agora:* items.
     view.webContents.on("before-input-event", (event, input) => {
       if (input.type !== "keyDown") return;
+      if (dispatchMenuAccelerator(input)) event.preventDefault();
+    });
+
+    // VS Code web vetoes unload after recent keyboard use
+    // (window.confirmBeforeClose: "keyboardOnly"); unhandled, the veto
+    // silently cancels webContents.reload(). An explicit Reload Editor is
+    // user intent, so override the veto for exactly that reload -- hot exit
+    // restores dirty buffers after the reload. All other vetoes stand.
+    view.webContents.on("will-prevent-unload", (event) => {
+      const pending = this.pendingReload;
       if (
-        input.meta &&
-        input.shift &&
-        !input.control &&
-        !input.alt &&
-        input.code === "KeyN"
+        pending !== null &&
+        pending.sessionId === sessionId &&
+        Date.now() - pending.at < 1000
       ) {
+        this.pendingReload = null;
         event.preventDefault();
-        this.getMainWindow()?.webContents.send(IPC.menuNewWorkspace);
       }
     });
 
@@ -192,6 +217,7 @@ export class ViewManager {
       view.webContents.close();
       throw err;
     }
+    return view;
   }
 }
 

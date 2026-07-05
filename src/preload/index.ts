@@ -4,6 +4,7 @@ import { IPC, type RendererApi } from "@shared/ipc";
 
 const api: RendererApi = {
   pickFolder: () => ipcRenderer.invoke(IPC.dialogPickFolder),
+  confirmCloseTab: (cwd) => ipcRenderer.invoke(IPC.dialogConfirmCloseTab, cwd),
   createSession: (cwd) => ipcRenderer.invoke(IPC.sessionCreate, cwd),
   closeSession: (sessionId) => ipcRenderer.invoke(IPC.sessionClose, sessionId),
   listSessions: () => ipcRenderer.invoke(IPC.sessionList),
@@ -16,10 +17,32 @@ const api: RendererApi = {
   setWorkspaceTabs: (tabs) => ipcRenderer.invoke(IPC.workspaceSetTabs, tabs),
   setWorkspaceActive: (activeId) =>
     ipcRenderer.invoke(IPC.workspaceSetActive, activeId),
+  setWorkspaceSidebar: (state) =>
+    ipcRenderer.invoke(IPC.workspaceSetSidebar, state),
   cwdExists: (cwd) => ipcRenderer.invoke(IPC.cwdExists, cwd),
   onMenuNewWorkspace: (cb) => {
     ipcRenderer.on(IPC.menuNewWorkspace, cb);
     return () => ipcRenderer.removeListener(IPC.menuNewWorkspace, cb);
+  },
+  onMenuToggleSidebar: (cb) => {
+    ipcRenderer.on(IPC.menuToggleSidebar, cb);
+    return () => ipcRenderer.removeListener(IPC.menuToggleSidebar, cb);
+  },
+  onMenuCloseTab: (cb) => {
+    ipcRenderer.on(IPC.menuCloseTab, cb);
+    return () => ipcRenderer.removeListener(IPC.menuCloseTab, cb);
+  },
+  onMenuCycleWorkspace: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, direction: 1 | -1) =>
+      cb(direction);
+    ipcRenderer.on(IPC.menuCycleWorkspace, listener);
+    return () => ipcRenderer.removeListener(IPC.menuCycleWorkspace, listener);
+  },
+  onMenuJumpWorkspace: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, index: number) =>
+      cb(index);
+    ipcRenderer.on(IPC.menuJumpWorkspace, listener);
+    return () => ipcRenderer.removeListener(IPC.menuJumpWorkspace, listener);
   },
 };
 
