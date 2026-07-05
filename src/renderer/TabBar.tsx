@@ -1,7 +1,8 @@
 // Vertical tab bar -- one row per persisted project, "+" at the bottom.
-// Right-click on a row pops a context menu with a single Close action
-// (Q7: closing kills a code-server + any in-flight agent work, so the
-// only path to it is intentional). Click anywhere else dismisses.
+// Right-click on a row pops a context menu with a single Close action.
+// Closing destroys the tab's view; server-side terminal processes keep
+// running until app quit (shared code-server). Click anywhere else
+// dismisses.
 //
 // Per-tab visual state is driven entirely by props -- this component
 // owns no session state, just the open-context-menu coordinates.

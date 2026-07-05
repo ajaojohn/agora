@@ -31,6 +31,11 @@ export function App() {
     () => new Map(),
   );
 
+  // Ref mirror of tabs -- spawn() completions race against close(); they
+  // must check tab membership at resolution time, not capture time.
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
   // Mount: hydrate from persisted workspace, then spawn the previously-active
   // tab eagerly (hybrid spawn -- other tabs stay unspawned until clicked).
   useEffect(() => {
@@ -59,13 +64,18 @@ export function App() {
 
   // Spawn a tab: pre-check cwd existence, then createSession + setActiveView.
   // Updates perTabState through each phase. cwd-vanished gets a clearer
-  // message (Q14 cwd-vanished special case). If createSession succeeds but
-  // setActiveView fails, we close the orphan session before throwing so a
-  // retry doesn't leak code-server children.
+  // message (Q14 cwd-vanished special case). Every await is a window for the
+  // user to close the tab, so each landing checks `gone()` -- a completed
+  // spawn for a closed tab must tear down its view + session instead of
+  // re-inserting state for a deleted id.
   async function spawn(tab: Tab): Promise<void> {
     setPerTabState((prev) => new Map(prev).set(tab.id, { kind: "loading" }));
 
-    if (!(await window.api.cwdExists(tab.cwd))) {
+    const gone = (): boolean => !tabsRef.current.some((t) => t.id === tab.id);
+
+    const cwdOk = await window.api.cwdExists(tab.cwd);
+    if (gone()) return;
+    if (!cwdOk) {
       setPerTabState((prev) =>
         new Map(prev).set(tab.id, {
           kind: "error",
@@ -79,15 +89,23 @@ export function App() {
     try {
       session = await window.api.createSession(tab.cwd);
       await window.api.setActiveView(session.sessionId);
+      if (gone()) {
+        // Tab closed mid-spawn: destroy the view + session that just came
+        // up so they don't leak as a hidden webContents + stale record.
+        await window.api.closeView(session.sessionId);
+        await window.api.closeSession(session.sessionId);
+        return;
+      }
       setPerTabState((prev) =>
         new Map(prev).set(tab.id, { kind: "loaded", session: session! }),
       );
     } catch (err) {
       if (session) {
         await window.api.closeSession(session.sessionId).catch(() => {
-          // best-effort -- if cleanup fails the child will be killed at app quit anyway
+          // best-effort -- the stale record is dropped at app quit anyway
         });
       }
+      if (gone()) return;
       const message = err instanceof Error ? err.message : String(err);
       setPerTabState((prev) =>
         new Map(prev).set(tab.id, { kind: "error", message }),
@@ -138,7 +156,8 @@ export function App() {
     await spawn(tab);
   }
 
-  // Close-tab: destroy view + kill code-server, remove from list, switch
+  // Close-tab: destroy view + drop the session record (the shared
+  // code-server keeps running for other tabs), remove from list, switch
   // active to right neighbor (fall back to left, fall back to no-active),
   // persist. order is recomputed so the persisted indices stay contiguous.
   async function close(tab: Tab): Promise<void> {
