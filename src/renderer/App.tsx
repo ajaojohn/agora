@@ -27,6 +27,7 @@ export type TabState =
 const SIDEBAR_MIN_PX = 120;
 const SIDEBAR_MAX_PX = 400;
 const SIDEBAR_DEFAULT_PX = 200;
+const SIDEBAR_SNAP_HIDE_PX = 80;
 
 function clampSidebarWidth(px: number): number {
   const max = Math.min(SIDEBAR_MAX_PX, Math.floor(window.innerWidth / 2));
@@ -149,6 +150,11 @@ export function App() {
   useEffect(() => {
     if (!sidebarDragging) return;
     function onMove(e: PointerEvent): void {
+      if (e.clientX < SIDEBAR_SNAP_HIDE_PX) {
+        setSidebarHidden(true);
+        return;
+      }
+      setSidebarHidden(false);
       setSidebarWidth(clampSidebarWidth(e.clientX));
     }
     function onUp(): void {
@@ -170,6 +176,15 @@ export function App() {
   function startSidebarDrag(): void {
     if (activeSessionRef.current) void window.api.setActiveView(null);
     setSidebarDragging(true);
+  }
+
+  function toggleSidebar(): void {
+    const hidden = !sidebarRef.current.hidden;
+    setSidebarHidden(hidden);
+    void window.api.setWorkspaceSidebar({
+      width: sidebarRef.current.width,
+      hidden,
+    });
   }
 
   // Make `tab` the active tab. If already loaded, reuses the live view via
@@ -285,22 +300,34 @@ export function App() {
 
   return (
     <div className="app">
-      <TabBar
-        tabs={tabs}
-        activeId={activeId}
-        perTabState={perTabState}
-        width={sidebarWidth}
-        onActivate={activate}
-        onClose={close}
-        onAdd={open}
-      />
-      <div
-        className="sidebar-handle"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          startSidebarDrag();
-        }}
-      />
+      {!sidebarHidden && (
+        <>
+          <TabBar
+            tabs={tabs}
+            activeId={activeId}
+            perTabState={perTabState}
+            width={sidebarWidth}
+            onActivate={activate}
+            onClose={close}
+            onAdd={open}
+          />
+          <div
+            className="sidebar-handle"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              startSidebarDrag();
+            }}
+            onDoubleClick={toggleSidebar}
+          />
+        </>
+      )}
+      {sidebarHidden && (
+        <div
+          className="sidebar-reveal"
+          title="Show Sidebar"
+          onClick={toggleSidebar}
+        />
+      )}
       {sidebarDragging && <div className="drag-shield" />}
       <div className="content">
         {activeId === null && <EmptyHint onOpen={open} />}

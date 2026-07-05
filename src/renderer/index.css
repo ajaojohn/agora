@@ -134,6 +134,17 @@ button:hover {
   cursor: col-resize;
 }
 
+/* Left-edge reveal strip shown while the sidebar is hidden. */
+.sidebar-reveal {
+  flex: 0 0 8px;
+  cursor: pointer;
+  border-right: 1px solid rgba(128, 128, 128, 0.25);
+  background: rgba(128, 128, 128, 0.05);
+}
+.sidebar-reveal:hover {
+  background: rgba(74, 158, 255, 0.2);
+}
+
 .tab-list {
   flex: 1;
   overflow-y: auto;
