@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/ajaojohn/agora/compare/v0.2.0...v0.2.1) (2026-07-05)
+
+
+### Bug Fixes
+
+* publish releases immediately so the version tag always exists ([#21](https://github.com/ajaojohn/agora/issues/21)) ([9846497](https://github.com/ajaojohn/agora/commit/9846497fd3b8f845e0d1ea766d9eaaf1d7219d2f))
+
 ## [0.2.0](https://github.com/ajaojohn/agora/compare/v0.1.3...v0.2.0) (2026-07-05)
 
 
