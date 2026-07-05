@@ -6,7 +6,7 @@
       "package-name": "agora",
       "include-v-in-tag": true,
       "include-component-in-tag": false,
-      "draft": true,
+      "draft": false,
       "prerelease": false,
       "changelog-sections": [
         { "type": "feat", "section": "Features" },
