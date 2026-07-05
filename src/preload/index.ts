@@ -32,6 +32,18 @@ const api: RendererApi = {
     ipcRenderer.on(IPC.menuCloseTab, cb);
     return () => ipcRenderer.removeListener(IPC.menuCloseTab, cb);
   },
+  onMenuCycleWorkspace: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, direction: 1 | -1) =>
+      cb(direction);
+    ipcRenderer.on(IPC.menuCycleWorkspace, listener);
+    return () => ipcRenderer.removeListener(IPC.menuCycleWorkspace, listener);
+  },
+  onMenuJumpWorkspace: (cb) => {
+    const listener = (_e: Electron.IpcRendererEvent, index: number) =>
+      cb(index);
+    ipcRenderer.on(IPC.menuJumpWorkspace, listener);
+    return () => ipcRenderer.removeListener(IPC.menuJumpWorkspace, listener);
+  },
 };
 
 // Puts `api` on the renderer's `window` as `window.api`.

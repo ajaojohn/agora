@@ -69,7 +69,49 @@ export function installApplicationMenu(
         { role: "togglefullscreen" },
       ],
     },
-    { role: "windowMenu" },
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        { type: "separator" },
+        {
+          id: "agora:prevWorkspace",
+          label: "Previous Workspace",
+          accelerator: "Ctrl+Cmd+[",
+          click: () => {
+            getMainWindow()?.webContents.send(IPC.menuCycleWorkspace, -1);
+          },
+        },
+        {
+          id: "agora:nextWorkspace",
+          label: "Next Workspace",
+          accelerator: "Ctrl+Cmd+]",
+          click: () => {
+            getMainWindow()?.webContents.send(IPC.menuCycleWorkspace, 1);
+          },
+        },
+        { type: "separator" },
+        ...workspaceJumpItems(getMainWindow),
+        { type: "separator" },
+        { role: "front" },
+      ],
+    },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+// Ctrl+Cmd+1..9 jump to the Nth workspace in sidebar order. Real menu
+// items so the accelerators register and the view dispatcher finds them.
+function workspaceJumpItems(
+  getMainWindow: () => BrowserWindow | null,
+): MenuItemConstructorOptions[] {
+  return Array.from({ length: 9 }, (_, i) => ({
+    id: `agora:jumpWorkspace${i + 1}`,
+    label: `Workspace ${i + 1}`,
+    accelerator: `Ctrl+Cmd+${i + 1}`,
+    click: () => {
+      getMainWindow()?.webContents.send(IPC.menuJumpWorkspace, i);
+    },
+  }));
 }

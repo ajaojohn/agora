@@ -16,21 +16,30 @@ interface ParsedAccelerator {
   code: string;
 }
 
-// Minimal parser: modifier+single-letter accelerators only, which is all
-// Agora uses. Returns null (never matches) for anything fancier.
+// Minimal parser: modifier + letter/digit/bracket accelerators only, which
+// is all Agora uses. Returns null (never matches) for anything fancier.
 // CmdOrCtrl maps to meta only -- correct for this Mac-only app.
 function parse(accelerator: string): ParsedAccelerator | null {
   const parts = accelerator.split("+");
-  const key = parts.pop() ?? "";
-  if (!/^[a-zA-Z]$/.test(key)) return null;
+  const code = keyToCode(parts.pop() ?? "");
+  if (code === null) return null;
   const mods = new Set(parts.map((p) => p.toLowerCase()));
   return {
     meta: mods.has("cmd") || mods.has("command") || mods.has("cmdorctrl"),
     ctrl: mods.has("ctrl") || mods.has("control"),
     alt: mods.has("alt") || mods.has("option"),
     shift: mods.has("shift"),
-    code: `Key${key.toUpperCase()}`,
+    code,
   };
+}
+
+// Accelerator key -> KeyboardEvent.code, for the keys Agora binds.
+function keyToCode(key: string): string | null {
+  if (/^[a-zA-Z]$/.test(key)) return `Key${key.toUpperCase()}`;
+  if (/^[0-9]$/.test(key)) return `Digit${key}`;
+  if (key === "[") return "BracketLeft";
+  if (key === "]") return "BracketRight";
+  return null;
 }
 
 // Returns true when a menu item consumed the keystroke (caller should

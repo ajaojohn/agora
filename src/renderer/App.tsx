@@ -321,6 +321,39 @@ export function App() {
     [],
   );
 
+  // Workspace switching from the menu. Cycle wraps in sidebar order; with
+  // no active tab it falls back to the first.
+  function cycleWorkspace(direction: 1 | -1): void {
+    if (tabs.length === 0) return;
+    const idx =
+      activeId !== null ? tabs.findIndex((t) => t.id === activeId) : -1;
+    if (idx === -1) {
+      void activate(tabs[0]);
+      return;
+    }
+    const next = tabs[(idx + direction + tabs.length) % tabs.length];
+    if (next.id !== activeId) void activate(next);
+  }
+
+  function jumpWorkspace(index: number): void {
+    const tab = tabs[index];
+    if (tab && tab.id !== activeId) void activate(tab);
+  }
+
+  const cycleWorkspaceRef = useRef(cycleWorkspace);
+  cycleWorkspaceRef.current = cycleWorkspace;
+  useEffect(
+    () => window.api.onMenuCycleWorkspace((d) => cycleWorkspaceRef.current(d)),
+    [],
+  );
+
+  const jumpWorkspaceRef = useRef(jumpWorkspace);
+  jumpWorkspaceRef.current = jumpWorkspace;
+  useEffect(
+    () => window.api.onMenuJumpWorkspace((i) => jumpWorkspaceRef.current(i)),
+    [],
+  );
+
   // Window title: Mac convention is "<app> — <doc>". Empty when no active.
   useEffect(() => {
     if (activeId !== null) {

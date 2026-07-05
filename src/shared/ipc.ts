@@ -29,6 +29,8 @@ export const IPC = {
   menuNewWorkspace: "menu:newWorkspace",
   menuToggleSidebar: "menu:toggleSidebar",
   menuCloseTab: "menu:closeTab",
+  menuCycleWorkspace: "menu:cycleWorkspace",
+  menuJumpWorkspace: "menu:jumpWorkspace",
 } as const;
 
 export type PickFolderResponse = { path: string } | null;
@@ -120,4 +122,8 @@ export interface RendererApi {
   onMenuNewWorkspace(cb: () => void): () => void;
   onMenuToggleSidebar(cb: () => void): () => void;
   onMenuCloseTab(cb: () => void): () => void;
+  // direction: +1 next / -1 previous, wrapping in sidebar order.
+  onMenuCycleWorkspace(cb: (direction: 1 | -1) => void): () => void;
+  // index: 0-based position in sidebar order.
+  onMenuJumpWorkspace(cb: (index: number) => void): () => void;
 }
